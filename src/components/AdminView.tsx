@@ -6,7 +6,7 @@ import {
   HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2
 } from 'lucide-react';
 import { 
-  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS 
+  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
@@ -2423,242 +2423,222 @@ export const AdminView: React.FC<AdminViewProps> = ({
           {/* 3. SUB-TAB: WEEKLY SHIFT MATRIX SCHEDULE INPUT                   */}
           {/* ================================================================ */}
           {/* ================================================================ */}
-          {/* 3. SUB-TAB: IMAGE 2 TIMETABLE MATRIX (시간대별 × 요일별)           */}
+          {/* 3. SUB-TAB: IMAGE 1 MASTER TIMETABLE MATRIX                      */}
           {/* ================================================================ */}
-          {adminCNSubTab === 'schedule' && (() => {
-            const currentGroup = cnGroupSchedules?.find(g => g.id === selectedGroupId) || cnGroupSchedules?.[0];
-            const IMAGE2_DAYS = [
-              { day: 1, name: '월', isWeekend: false },
-              { day: 2, name: '화', isWeekend: false },
-              { day: 3, name: '수', isWeekend: false },
-              { day: 4, name: '목', isWeekend: false },
-              { day: 5, name: '금', isWeekend: false },
-              { day: 6, name: '토', isWeekend: true },
-              { day: 0, name: '일', isWeekend: true }
-            ];
+          {adminCNSubTab === 'schedule' && (
+            <div className="space-y-4">
+              
+              {/* Datalist for autocompleting common nurse post names */}
+              <datalist id="cn-posts-datalist">
+                {cnPosts.map(p => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} (UCAP: {p.ucap})
+                  </option>
+                ))}
+              </datalist>
 
-            return (
-              <div className="space-y-4">
-                
-                {/* Ward Groups Selector Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-950/80 rounded-2xl border border-slate-800">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {cnGroupSchedules?.map((grp, idx) => (
-                      <button
-                        key={grp.id}
-                        onClick={() => setSelectedGroupId(grp.id)}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                          selectedGroupId === grp.id
-                            ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                        }`}
-                      >
-                        <span>📌 {grp.title.split(' ')[0]} {grp.title.split(' ')[1] || `그룹 ${idx + 1}`}</span>
-                        {grp.wards.length > 0 && (
-                          <span className="px-1.5 py-0.2 rounded bg-black/30 text-[10px] font-mono">
-                            {grp.wards.slice(0, 3).join(', ')}{grp.wards.length > 3 ? '...' : ''}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-
-                    <button
-                      onClick={handleAddCNGroup}
-                      className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-dashed border-cyan-800/60 transition"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      새 근무표 그룹 추가
-                    </button>
-                  </div>
-
-                  {cnGroupSchedules && cnGroupSchedules.length > 1 && currentGroup && (
-                    <button
-                      onClick={() => handleDeleteCNGroup(currentGroup.id, currentGroup.title)}
-                      className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-rose-400 transition"
-                      title="현재 근무표 그룹 삭제"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+              {/* Top Bar: Title & Add Group Button */}
+              <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-cyan-400" />
+                    공통전담간호사 통합 주간 근무표 (부서/병동그룹별 × 3교대 × 요일별)
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    병동 그룹(부서)별 3교대 시간대에 맞추어 공통전담(1, 2, 3...)을 배정합니다. 핸드폰 관리의 공용 UCAP 번호가 표에 자동 연동되어 함께 표시됩니다.
+                  </p>
                 </div>
 
-                {currentGroup ? (
-                  <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-2xl space-y-4">
-                    
-                    {/* Image 2 Top Header: Title (Left) and Wards List (Right) */}
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                      <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Edit3 className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <input
-                          type="text"
-                          value={currentGroup.title}
-                          onChange={e => handleUpdateCNGroupTitle(currentGroup.id, e.target.value)}
-                          placeholder="근무표 명칭 (예: 9/1 ~ 공통 전담간호사 근무)"
-                          className="bg-transparent text-base sm:text-lg font-black text-white focus:outline-none focus:border-b-2 focus:border-cyan-400 w-full sm:w-80"
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-slate-400 font-bold">관할 병동:</span>
-                        <div className="flex flex-wrap items-center gap-1 font-mono text-xs font-extrabold text-cyan-300">
-                          {currentGroup.wards.length > 0 ? (
-                            currentGroup.wards.map(w => (
-                              <span key={w} className="px-2 py-0.5 rounded-lg bg-cyan-950 border border-cyan-800/50">
-                                {w}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-500 italic">미배정</span>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => setEditingGroupWardsId(currentGroup.id)}
-                          className="px-3 py-1 rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition"
-                        >
-                          + 병동 설정/선택
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Quick helper tip */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                      <span>💡 각 셀에 <strong>UCAP 번호</strong>와 <strong>공통전담(1, 2, 3...)</strong> 명칭을 직접 입력하거나 하단 빠른 채우기 버튼을 클릭하세요.</span>
-                      <span className="text-amber-400/90 font-semibold">* 공식 엑셀 서식(이미지 2) 동일 구현</span>
-                    </div>
-
-                    {/* Image 2 Timetable Table */}
-                    <div className="overflow-x-auto rounded-2xl border-2 border-slate-700 bg-slate-950">
-                      <table className="w-full text-xs text-center border-collapse">
-                        {/* Header Row 1: 시간 & 요일 */}
-                        <thead>
-                          <tr className="bg-slate-900 border-b-2 border-slate-700 text-white font-extrabold">
-                            <th className="p-3 w-36 border-r border-slate-700 text-sm">시간</th>
-                            {IMAGE2_DAYS.map(d => (
-                              <th 
-                                key={d.day} 
-                                className={`p-3 border-r border-slate-700 text-sm min-w-[130px] ${
-                                  d.name === '일' ? 'text-rose-300' : (d.name === '토' ? 'text-cyan-300' : 'text-slate-200')
-                                }`}
-                              >
-                                {d.name}
-                              </th>
-                            ))}
-                          </tr>
-
-                          {/* Header Row 2: Green Status Bar (공휴일-정상진료 / 공휴일) */}
-                          <tr className="border-b-2 border-slate-700">
-                            <th className="bg-slate-900/90 border-r border-slate-700"></th>
-                            <th 
-                              colSpan={5} 
-                              className="py-1.5 px-3 bg-emerald-700/80 text-emerald-100 font-bold text-xs border-r border-slate-700 tracking-wide"
-                            >
-                              공휴일-정상진료
-                            </th>
-                            <th 
-                              colSpan={2} 
-                              className="py-1.5 px-3 bg-emerald-700/80 text-emerald-100 font-bold text-xs tracking-wide"
-                            >
-                              공휴일
-                            </th>
-                          </tr>
-                        </thead>
-
-                        {/* Data Rows by TimeSlot (Day, Evening, Night) */}
-                        <tbody className="divide-y border-slate-700 font-medium">
-                          {timeSlots.map(ts => (
-                            <tr key={ts.id} className="divide-x border-slate-700">
-                              
-                              {/* Left Column: Time (06:30~14:30 / 14:30~22:00 / 22:00~06:30) */}
-                              <td className="p-3 font-mono font-black text-xs text-amber-300 bg-amber-950/30 border-r-2 border-slate-700 whitespace-nowrap">
-                                <div className="text-amber-200">{ts.start}~{ts.end}</div>
-                                <span className="text-[10px] text-amber-400/70 font-normal font-sans block mt-0.5">
-                                  {ts.name}
-                                </span>
-                              </td>
-
-                              {/* 7 Days Columns */}
-                              {IMAGE2_DAYS.map(d => {
-                                const cell = currentGroup.schedule?.[ts.id]?.[d.day] || { role: '', ucap: '' };
-                                const isFilled = Boolean(cell.ucap || cell.role);
-
-                                return (
-                                  <td 
-                                    key={d.day} 
-                                    className={`p-2 relative transition group ${
-                                      isFilled 
-                                        ? 'bg-amber-950/20 hover:bg-amber-950/30 border-amber-900/30' 
-                                        : 'hover:bg-slate-900/60'
-                                    }`}
-                                  >
-                                    <div className="space-y-1.5">
-                                      {/* UCAP Input */}
-                                      <input
-                                        type="text"
-                                        value={cell.ucap || ''}
-                                        placeholder="UCAP (5-4011)"
-                                        onChange={e => handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', e.target.value)}
-                                        className={`w-full text-center font-mono font-bold text-xs px-1 py-1 rounded bg-slate-900/80 border focus:outline-none transition ${
-                                          cell.ucap ? 'text-cyan-300 border-cyan-800/60 font-black' : 'text-slate-400 border-slate-800 focus:border-cyan-500'
-                                        }`}
-                                      />
-
-                                      {/* Role / Post Name Input */}
-                                      <input
-                                        type="text"
-                                        value={cell.role || ''}
-                                        placeholder="공통전담 1"
-                                        onChange={e => handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', e.target.value)}
-                                        className={`w-full text-center text-[11px] px-1 py-0.5 rounded bg-slate-900/80 border focus:outline-none transition ${
-                                          cell.role ? 'text-amber-200 font-bold border-amber-800/60' : 'text-slate-400 border-slate-800 focus:border-cyan-500'
-                                        }`}
-                                      />
-
-                                      {/* Quick Fill Helpers (Hover Toolbar) */}
-                                      <div className="flex items-center justify-center gap-1 opacity-20 group-hover:opacity-100 transition pt-1">
-                                        {cnPosts.slice(0, 4).map(p => (
-                                          <button
-                                            key={p.id}
-                                            onClick={() => {
-                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', p.name);
-                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', p.ucap);
-                                            }}
-                                            className="px-1 py-0.5 rounded bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-[9px] text-slate-300 font-mono transition"
-                                            title={`${p.name} (${p.ucap}) 채우기`}
-                                          >
-                                            {p.name.replace('공통전담', '')}
-                                          </button>
-                                        ))}
-                                        {isFilled && (
-                                          <button
-                                            onClick={() => {
-                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', '');
-                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', '');
-                                            }}
-                                            className="px-1 py-0.5 rounded bg-rose-950 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] transition"
-                                            title="셀 비우기"
-                                          >
-                                            ×
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                );
-                              })}
-
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                  </div>
-                ) : null}
-
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleAddCNGroup}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    새 병동 그룹 추가
+                  </button>
+                </div>
               </div>
-            );
-          })()}
+
+              {/* Info Notice Box */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-cyan-950/40 border border-cyan-800/40 text-xs">
+                <span className="text-slate-300">
+                  💡 <strong>시간대</strong>는 [3교대 시간대 설정] 값이 자동 반영되며, <strong>공용 UCAP 번호</strong>는 [포스트 & UCAP/핸드폰 & 병동 설정]의 등록 정보와 실시간 연동됩니다.
+                </span>
+                <span className="text-cyan-400 font-bold font-mono">
+                  총 {cnGroupSchedules?.length || 0}개 병동 그룹 운용 중
+                </span>
+              </div>
+
+              {/* Master Unified Table (Matching Image 1) */}
+              <div className="overflow-x-auto rounded-2xl border-2 border-slate-700 bg-slate-950 shadow-2xl">
+                <table className="w-full text-xs text-center border-collapse">
+                  {/* Table Header: Image 1 exact columns */}
+                  <thead className="bg-slate-900 border-b-2 border-slate-700 text-white font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3.5 w-52 border-r border-slate-700 text-sm">병동 그룹</th>
+                      <th className="p-3.5 w-36 border-r border-slate-700 text-sm text-amber-300">시간대</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">월요일</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">화요일</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">수요일</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">목요일</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">금요일</th>
+                      <th className="p-3.5 border-r border-slate-700 min-w-[125px] text-cyan-300">토요일</th>
+                      <th className="p-3.5 min-w-[125px] text-rose-300">일요일</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y-2 divide-slate-800 font-medium">
+                    {cnGroupSchedules?.map((grp, grpIdx) => {
+                      const IMAGE1_DAYS = [
+                        { day: 1, name: '월' },
+                        { day: 2, name: '화' },
+                        { day: 3, name: '수' },
+                        { day: 4, name: '목' },
+                        { day: 5, name: '금' },
+                        { day: 6, name: '토' },
+                        { day: 0, name: '일' }
+                      ];
+
+                      return timeSlots.map((ts, tsIdx) => {
+                        return (
+                          <tr 
+                            key={`${grp.id}-${ts.id}`} 
+                            className={`divide-x divide-slate-800/80 transition hover:bg-slate-900/40 ${
+                              tsIdx === timeSlots.length - 1 ? 'border-b-2 border-slate-700' : ''
+                            }`}
+                          >
+                            {/* Column 1: 병동 그룹 (Rowspan = 3) */}
+                            {tsIdx === 0 && (
+                              <td 
+                                rowSpan={timeSlots.length} 
+                                className="align-top p-4 bg-slate-900/90 border-r-2 border-slate-700 text-left space-y-2.5"
+                              >
+                                <div>
+                                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                                    부서 / 관할 병동
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={grp.title}
+                                    onChange={e => handleUpdateCNGroupTitle(grp.id, e.target.value)}
+                                    placeholder="예: MICU, 81, 82W"
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-black text-white focus:outline-none focus:border-cyan-400"
+                                  />
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {grp.wards.slice(0, 4).map(w => (
+                                    <span key={w} className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50 text-[10px] font-bold">
+                                      {w}
+                                    </span>
+                                  ))}
+                                  {grp.wards.length > 4 && (
+                                    <span className="text-[10px] text-slate-500 font-mono">+{grp.wards.length - 4}</span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1.5 pt-1">
+                                  <button
+                                    onClick={() => setEditingGroupWardsId(grp.id)}
+                                    className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition"
+                                  >
+                                    + 병동 칩 선택
+                                  </button>
+
+                                  {cnGroupSchedules.length > 1 && (
+                                    <button
+                                      onClick={() => handleDeleteCNGroup(grp.id, grp.title)}
+                                      className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition"
+                                      title="그룹 삭제"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+
+                            {/* Column 2: 시간대 (06:30~14:30 / 14:30~22:00 / 22:00~06:30) */}
+                            <td className="p-3 font-mono font-bold text-xs bg-amber-950/20 text-amber-300 border-r border-slate-700 whitespace-nowrap text-center">
+                              <div>{ts.start}~{ts.end}</div>
+                              <span className="text-[10px] text-amber-400/60 font-sans block mt-0.5">
+                                {ts.name.split(' ')[0]}
+                              </span>
+                            </td>
+
+                            {/* Columns 3~9: 월, 화, 수, 목, 금, 토, 일 */}
+                            {IMAGE1_DAYS.map(d => {
+                              const cell = grp.schedule?.[ts.id]?.[d.day] || { role: '', ucap: '' };
+                              const contact = getCNPostContact(cell.role, cnPosts);
+                              const displayUcap = cell.ucap || contact.ucap;
+
+                              return (
+                                <td 
+                                  key={d.day} 
+                                  className="p-2 border-r border-slate-800/80 align-middle hover:bg-slate-900/60 transition group"
+                                >
+                                  <div className="space-y-1">
+                                    {/* Role Input with Datalist */}
+                                    <input
+                                      list="cn-posts-datalist"
+                                      type="text"
+                                      value={cell.role || ''}
+                                      onChange={e => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', e.target.value)}
+                                      placeholder="공통전담 1"
+                                      className={`w-full text-center font-bold text-xs px-2 py-1.5 rounded-lg border focus:outline-none transition ${
+                                        cell.role
+                                          ? 'bg-slate-900 text-white border-slate-700 focus:border-cyan-400'
+                                          : 'bg-slate-950 text-slate-500 border-slate-800 focus:border-cyan-400'
+                                      }`}
+                                    />
+
+                                    {/* Auto-resolved 공용 UCAP Display */}
+                                    {displayUcap ? (
+                                      <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-800/50 shadow-sm">
+                                        <span>📞 {displayUcap}</span>
+                                      </div>
+                                    ) : cell.role ? (
+                                      <div className="text-[9px] text-slate-500 italic">UCAP 미등록</div>
+                                    ) : null}
+
+                                    {/* Quick Hover Toolbar */}
+                                    <div className="hidden group-hover:flex items-center justify-center gap-0.5 pt-0.5">
+                                      {cnPosts.slice(0, 4).map(p => (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', p.name)}
+                                          className="px-1 py-0.2 rounded bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-[9px] text-slate-300 font-mono transition"
+                                          title={`${p.name} (${p.ucap})`}
+                                        >
+                                          {p.name.replace('공통전담', '')}
+                                        </button>
+                                      ))}
+                                      {cell.role && (
+                                        <button
+                                          onClick={() => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', '')}
+                                          className="px-1 py-0.2 rounded bg-rose-950 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] transition"
+                                          title="지우기"
+                                        >
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })}
+
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          )}
 
           {/* ================================================================ */}
           {/* MODAL: WARD SELECTION POPOVER / MODAL                            */}

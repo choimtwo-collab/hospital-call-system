@@ -1,5 +1,5 @@
 import { 
-  DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS 
+  DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS, getCNPostContact 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
@@ -325,25 +325,32 @@ export function evaluateDutyRules(
 
     const shiftDayOfWeek = shiftDate.getDay();
 
-    // 1순위: 이미지 2 기반 시간대별/요일별 근무표 (cnGroupSchedules)
-    const matchedGroup = cnGroupSchedules.find(g =>
-      g.wards.some(w => {
-        const cleanW = w.replace(/\s+/g, '').replace('병동', '');
-        const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '');
+    // 1순위: 이미지 1 공식 통합 주간 근무표 (cnGroupSchedules)
+    const matchedGroup = cnGroupSchedules.find(g => {
+      if (g.wards && g.wards.some(w => {
+        const cleanW = w.replace(/\s+/g, '').replace('병동', '').toLowerCase();
+        const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '').toLowerCase();
         return cleanW === cleanSel || cleanSel.includes(cleanW) || cleanW.includes(cleanSel);
-      })
-    ) || (cnGroupSchedules.length > 0 ? cnGroupSchedules[0] : null);
+      })) return true;
+      const cleanTitle = g.title.replace(/\s+/g, '').replace('병동', '').toLowerCase();
+      const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '').toLowerCase();
+      return cleanTitle.includes(cleanSel);
+    }) || (cnGroupSchedules.length > 0 ? cnGroupSchedules[0] : null);
 
     if (matchedGroup && targetTimeSlot) {
       const shiftCell = matchedGroup.schedule?.[targetTimeSlot.id]?.[shiftDayOfWeek];
       if (shiftCell && (shiftCell.ucap || shiftCell.role)) {
+        const contact = getCNPostContact(shiftCell.role, cnPosts);
+        const resolvedUcap = shiftCell.ucap || contact.ucap;
+        const resolvedPhone = shiftCell.phone || contact.phone;
+
         assignedRole = shiftCell.role || `${matchedGroup.title}`;
         assignedPerson = `${shiftCell.role || '공통전담'} (${targetTimeSlot.name})`;
-        dutyUcap = shiftCell.ucap || null;
-        dutyPhone = shiftCell.phone || null;
+        dutyUcap = resolvedUcap || null;
+        dutyPhone = resolvedPhone || null;
         contactInfo = {
-          phone: shiftCell.phone || '정보 없음',
-          ucap: shiftCell.ucap || '정보 없음',
+          phone: resolvedPhone || '정보 없음',
+          ucap: resolvedUcap || '정보 없음',
           dumcTalk: shiftCell.role || '공통전담간호사'
         };
         notes = `${matchedGroup.title} (${selectedWard}) - ${targetTimeSlot.name} 배정`;

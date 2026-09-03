@@ -314,91 +314,138 @@ for (let i = 0; i < 7; i++) {
   };
 }
 
-// 공통전담간호사 시간대별/요일별 근무표 (이미지 2 공식 양식 완벽 반영)
+export const getCNPostContact = (roleName: string, cnPosts: CNPost[]): { ucap: string; phone: string } => {
+  if (!roleName) return { ucap: '', phone: '' };
+  const clean = roleName.replace(/\s+/g, '');
+  const found = cnPosts.find(p => {
+    const pClean = p.name.replace(/\s+/g, '');
+    return pClean === clean || clean.includes(pClean) || pClean.includes(clean);
+  });
+  if (found) {
+    return { ucap: found.ucap, phone: found.phone };
+  }
+  const matchNum = roleName.match(/\d+/);
+  if (matchNum) {
+    const num = matchNum[0];
+    const foundByNum = cnPosts.find(p => p.name.includes(num) || p.id === `CN${num}`);
+    if (foundByNum) return { ucap: foundByNum.ucap, phone: foundByNum.phone };
+  }
+  return { ucap: '', phone: '' };
+};
+
+// 공통전담간호사 시간대별/요일별 근무표 (이미지 1 공식 엑셀 양식 6개 병동 그룹 완벽 반영)
 export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-1',
-    title: '9/1 ~ 공통 전담간호사 근무',
-    wards: ['42', '72', '121W', 'AKU', 'DR', 'DSR', '42병동', '72병동', '121병동'],
-    dayTypes: {
-      1: '공휴일-정상진료',
-      2: '공휴일-정상진료',
-      3: '공휴일-정상진료',
-      4: '공휴일-정상진료',
-      5: '공휴일-정상진료',
-      6: '공휴일',
-      0: '공휴일'
-    },
+    title: 'MICU, 81, 82W',
+    wards: ['MICU', '81', '82', '81W', '82W', '81병동', '82병동'],
     schedule: {
       'ts_day': {
-        1: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
-        2: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
-        3: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }, // Image 2: 5-4011 (DUMC: 공통전담2 4)
-        4: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
-        5: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
-        6: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }, // Image 2 토: 5-4011
-        0: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }  // Image 2 일: 5-4011
+        1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
       },
       'ts_eve': {
-        1: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
-        2: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
-        3: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' }, // Image 2 수: 5-4006 (DUMC: 공통전담2 3)
-        4: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
-        5: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
-        6: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
-        0: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }
+        1: { role: '공통전담 3', ucap: '53003' }, 2: { role: '공통전담 3', ucap: '53003' }, 3: { role: '공통전담 3', ucap: '53003' },
+        4: { role: '공통전담 3', ucap: '53003' }, 5: { role: '공통전담 3', ucap: '53003' }, 6: { role: '공통전담 4', ucap: '53004' }, 0: { role: '공통전담 4', ucap: '53004' }
       },
       'ts_night': {
-        1: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
-        2: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
-        3: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }, // Image 2 수: 5-4004 (DUMC: 공통전담2 2)
-        4: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
-        5: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
-        6: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }, // Image 2 토: 5-4004
-        0: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }  // Image 2 일: 5-4004
+        1: { role: '공통전담 3', ucap: '53003' }, 2: { role: '공통전담 3', ucap: '53003' }, 3: { role: '공통전담 3', ucap: '53003' },
+        4: { role: '공통전담 3', ucap: '53003' }, 5: { role: '공통전담 3', ucap: '53003' }, 6: { role: '공통전담 4', ucap: '53004' }, 0: { role: '공통전담 4', ucap: '53004' }
       }
     }
   },
   {
     id: 'cng-2',
-    title: '공통 전담간호사 2조 (병동 일반)',
-    wards: ['61', '62', '81', '82', '61병동', '62병동', '81병동', '82병동'],
-    dayTypes: {
-      1: '평일',
-      2: '평일',
-      3: '평일',
-      4: '평일',
-      5: '평일',
-      6: '주말/공휴일',
-      0: '주말/공휴일'
-    },
+    title: '한방, 71W',
+    wards: ['한방', '71', '71W', '71병동'],
     schedule: {
       'ts_day': {
-        1: { role: '공통전담 1', ucap: '53001' },
-        2: { role: '공통전담 1', ucap: '53001' },
-        3: { role: '공통전담 1', ucap: '53001' },
-        4: { role: '공통전담 1', ucap: '53001' },
-        5: { role: '공통전담 1', ucap: '53001' },
-        6: { role: '공통전담 1', ucap: '53001' },
-        0: { role: '공통전담 1', ucap: '53001' }
+        1: { role: '공통전담 1', ucap: '53001' }, 2: { role: '공통전담 1', ucap: '53001' }, 3: { role: '공통전담 1', ucap: '53001' },
+        4: { role: '공통전담 1', ucap: '53001' }, 5: { role: '공통전담 1', ucap: '53001' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
       },
       'ts_eve': {
-        1: { role: '공통전담 2', ucap: '53002' },
-        2: { role: '공통전담 2', ucap: '53002' },
-        3: { role: '공통전담 2', ucap: '53002' },
-        4: { role: '공통전담 2', ucap: '53002' },
-        5: { role: '공통전담 2', ucap: '53002' },
-        6: { role: '공통전담 2', ucap: '53002' },
-        0: { role: '공통전담 2', ucap: '53002' }
+        1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 2', ucap: '53002' }, 0: { role: '공통전담 2', ucap: '53002' }
       },
       'ts_night': {
-        1: { role: '공통전담 3', ucap: '53003' },
-        2: { role: '공통전담 3', ucap: '53003' },
-        3: { role: '공통전담 3', ucap: '53003' },
-        4: { role: '공통전담 3', ucap: '53003' },
-        5: { role: '공통전담 3', ucap: '53003' },
-        6: { role: '공통전담 3', ucap: '53003' },
-        0: { role: '공통전담 3', ucap: '53003' }
+        1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 2', ucap: '53002' }, 0: { role: '공통전담 2', ucap: '53002' }
+      }
+    }
+  },
+  {
+    id: 'cng-3',
+    title: 'SICU, 61, 62W',
+    wards: ['SICU', '61', '62', '61W', '62W', '61병동', '62병동'],
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담 3', ucap: '53003' }, 2: { role: '공통전담 3', ucap: '53003' }, 3: { role: '공통전담 3', ucap: '53003' },
+        4: { role: '공통전담 3', ucap: '53003' }, 5: { role: '공통전담 3', ucap: '53003' }, 6: { role: '공통전담 2', ucap: '53002' }, 0: { role: '공통전담 2', ucap: '53002' }
+      },
+      'ts_eve': {
+        1: { role: '공통전담 1', ucap: '53001' }, 2: { role: '공통전담 1', ucap: '53001' }, 3: { role: '공통전담 1', ucap: '53001' },
+        4: { role: '공통전담 1', ucap: '53001' }, 5: { role: '공통전담 1', ucap: '53001' }, 6: { role: '공통전담 3', ucap: '53003' }, 0: { role: '공통전담 3', ucap: '53003' }
+      },
+      'ts_night': {
+        1: { role: '공통전담 1', ucap: '53001' }, 2: { role: '공통전담 1', ucap: '53001' }, 3: { role: '공통전담 1', ucap: '53001' },
+        4: { role: '공통전담 1', ucap: '53001' }, 5: { role: '공통전담 1', ucap: '53001' }, 6: { role: '공통전담 3', ucap: '53003' }, 0: { role: '공통전담 3', ucap: '53003' }
+      }
+    }
+  },
+  {
+    id: 'cng-4',
+    title: '42, 72, 121W, AKU, DR, DSR',
+    wards: ['42', '72', '121W', 'AKU', 'DR', 'DSR', '42병동', '72병동', '121병동'],
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
+      },
+      'ts_eve': {
+        1: { role: '공통전담 3', ucap: '53003' }, 2: { role: '공통전담 3', ucap: '53003' }, 3: { role: '공통전담 3', ucap: '53003' },
+        4: { role: '공통전담 3', ucap: '53003' }, 5: { role: '공통전담 3', ucap: '53003' }, 6: { role: '공통전담 4', ucap: '53004' }, 0: { role: '공통전담 4', ucap: '53004' }
+      },
+      'ts_night': {
+        1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 2', ucap: '53002' }, 0: { role: '공통전담 2', ucap: '53002' }
+      }
+    }
+  },
+  {
+    id: 'cng-5',
+    title: '102, 111, 112W',
+    wards: ['102', '111', '112', '102W', '111W', '112W', '102병동', '111병동', '112병동'],
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담 4', ucap: '53004' }, 2: { role: '공통전담 4', ucap: '53004' }, 3: { role: '공통전담 4', ucap: '53004' },
+        4: { role: '공통전담 4', ucap: '53004' }, 5: { role: '공통전담 4', ucap: '53004' }, 6: { role: '공통전담 3', ucap: '53003' }, 0: { role: '공통전담 3', ucap: '53003' }
+      },
+      'ts_eve': {
+        1: { role: '공통전담 5', ucap: '53005' }, 2: { role: '공통전담 5', ucap: '53005' }, 3: { role: '공통전담 5', ucap: '53005' },
+        4: { role: '공통전담 5', ucap: '53005' }, 5: { role: '공통전담 5', ucap: '53005' }, 6: { role: '공통전담 5', ucap: '53005' }, 0: { role: '공통전담 5', ucap: '53005' }
+      },
+      'ts_night': {
+        1: { role: '공통전담 5', ucap: '53005' }, 2: { role: '공통전담 5', ucap: '53005' }, 3: { role: '공통전담 5', ucap: '53005' },
+        4: { role: '공통전담 5', ucap: '53005' }, 5: { role: '공통전담 5', ucap: '53005' }, 6: { role: '공통전담 5', ucap: '53005' }, 0: { role: '공통전담 5', ucap: '53005' }
+      }
+    }
+  },
+  {
+    id: 'cng-6',
+    title: '주사실, ,92,101W',
+    wards: ['주사실', '92', '101', '92W', '101W', '92병동', '101병동'],
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담 5', ucap: '53005' }, 2: { role: '공통전담 5', ucap: '53005' }, 3: { role: '공통전담 5', ucap: '53005' },
+        4: { role: '공통전담 5', ucap: '53005' }, 5: { role: '공통전담 5', ucap: '53005' }, 6: { role: '공통전담 4', ucap: '53004' }, 0: { role: '공통전담 4', ucap: '53004' }
+      },
+      'ts_eve': {
+        1: { role: '공통전담 4', ucap: '53004' }, 2: { role: '공통전담 4', ucap: '53004' }, 3: { role: '공통전담 4', ucap: '53004' },
+        4: { role: '공통전담 4', ucap: '53004' }, 5: { role: '공통전담 4', ucap: '53004' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
+      },
+      'ts_night': {
+        1: { role: '공통전담 4', ucap: '53004' }, 2: { role: '공통전담 4', ucap: '53004' }, 3: { role: '공통전담 4', ucap: '53004' },
+        4: { role: '공통전담 4', ucap: '53004' }, 5: { role: '공통전담 4', ucap: '53004' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
       }
     }
   }
