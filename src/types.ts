@@ -25,6 +25,22 @@ export interface CNPost {
   dumcTalk?: string;
 }
 
+export interface CNShiftCell {
+  role: string;    // e.g. '공통전담2 4' or '공통전담 1'
+  ucap: string;    // e.g. '5-4011'
+  phone?: string;
+  nurseName?: string;
+  notes?: string;
+}
+
+export interface CNGroupSchedule {
+  id: string;
+  title: string;
+  wards: string[];
+  dayTypes?: Record<number, string>; // e.g. { 1: '공휴일-정상진료', ..., 6: '공휴일', 0: '공휴일' }
+  schedule: Record<string, Record<number, CNShiftCell>>;
+}
+
 // weeklyCNSchedule[dayOfWeek 0..6][timeSlotId][cnPostId] = nurseName
 export type WeeklyCNScheduleMap = Record<number, Record<string, Record<string, string>>>;
 

@@ -3,7 +3,7 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  SearchResult, ContactInfo, CustomRule, PathologistSchedule, DutyPhoneItem 
+  SearchResult, ContactInfo, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule 
 } from '../types';
 import { checkKoreanHoliday } from './koreanHolidays';
 
@@ -42,7 +42,8 @@ export function evaluateDutyRules(
   weeklyCNSchedule: WeeklyCNScheduleMap,
   customRules: CustomRule[] = [],
   pathologistSchedules: PathologistSchedule[] = [],
-  dutyPhones: DutyPhoneItem[] = []
+  dutyPhones: DutyPhoneItem[] = [],
+  cnGroupSchedules: CNGroupSchedule[] = []
 ): SearchResult {
   const holidayInfo = checkKoreanHoliday(selectedDate);
   const isWeekendOrHoliday = holidayInfo.isHolidayOrWeekend;
@@ -301,8 +302,8 @@ export function evaluateDutyRules(
   let backupContact2: (ContactInfo & { roleName: string }) | undefined = undefined;
 
   // 공통 전담간호사 매칭 세부 로직
+  // 공통 전담간호사 매칭 세부 로직
   if (assignedRole === ROLES.COMMON_NURSE) {
-    const targetCN = cnPosts.find(cn => cn.wards.includes(selectedWard));
     let targetTimeSlot: TimeSlot | null = null;
     const shiftDate = new Date(selectedDate);
 
@@ -322,25 +323,55 @@ export function evaluateDutyRules(
       }
     }
 
-    if (targetCN && targetTimeSlot) {
-      const shiftDayOfWeek = shiftDate.getDay();
-      const scheduleForDay = weeklyCNSchedule[shiftDayOfWeek] || {};
-      const scheduleForSlot = scheduleForDay[targetTimeSlot.id] || {};
-      const nurseName = scheduleForSlot[targetCN.id];
+    const shiftDayOfWeek = shiftDate.getDay();
 
-      assignedRole = `${targetCN.name} (${targetTimeSlot.name})`;
-      assignedPerson = nurseName || '미배정(근무자 없음)';
-      dutyPhone = targetCN.phone;
-      dutyUcap = targetCN.ucap;
-      contactInfo = {
-        phone: targetCN.phone,
-        ucap: targetCN.ucap,
-        dumcTalk: targetCN.dumcTalk || targetCN.name
-      };
-    } else {
-      assignedRole = '공통전담간호사 (배정정보 없음)';
-      assignedPerson = '당직표 확인 요망';
-      notes = notes || '해당 시간대나 병동에 관리자가 배정한 공통전담간호사 정보가 없습니다.';
+    // 1순위: 이미지 2 기반 시간대별/요일별 근무표 (cnGroupSchedules)
+    const matchedGroup = cnGroupSchedules.find(g =>
+      g.wards.some(w => {
+        const cleanW = w.replace(/\s+/g, '').replace('병동', '');
+        const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '');
+        return cleanW === cleanSel || cleanSel.includes(cleanW) || cleanW.includes(cleanSel);
+      })
+    ) || (cnGroupSchedules.length > 0 ? cnGroupSchedules[0] : null);
+
+    if (matchedGroup && targetTimeSlot) {
+      const shiftCell = matchedGroup.schedule?.[targetTimeSlot.id]?.[shiftDayOfWeek];
+      if (shiftCell && (shiftCell.ucap || shiftCell.role)) {
+        assignedRole = shiftCell.role || `${matchedGroup.title}`;
+        assignedPerson = `${shiftCell.role || '공통전담'} (${targetTimeSlot.name})`;
+        dutyUcap = shiftCell.ucap || null;
+        dutyPhone = shiftCell.phone || null;
+        contactInfo = {
+          phone: shiftCell.phone || '정보 없음',
+          ucap: shiftCell.ucap || '정보 없음',
+          dumcTalk: shiftCell.role || '공통전담간호사'
+        };
+        notes = `${matchedGroup.title} (${selectedWard}) - ${targetTimeSlot.name} 배정`;
+      }
+    }
+
+    // 2순위: 기존 포스트 기준 매칭 fallback
+    if (!dutyUcap && !contactInfo.ucap) {
+      const targetCN = cnPosts.find(cn => cn.wards.includes(selectedWard));
+      if (targetCN && targetTimeSlot) {
+        const scheduleForDay = weeklyCNSchedule[shiftDayOfWeek] || {};
+        const scheduleForSlot = scheduleForDay[targetTimeSlot.id] || {};
+        const nurseName = scheduleForSlot[targetCN.id];
+
+        assignedRole = `${targetCN.name} (${targetTimeSlot.name})`;
+        assignedPerson = nurseName || '미배정(근무자 없음)';
+        dutyPhone = targetCN.phone;
+        dutyUcap = targetCN.ucap;
+        contactInfo = {
+          phone: targetCN.phone,
+          ucap: targetCN.ucap,
+          dumcTalk: targetCN.dumcTalk || targetCN.name
+        };
+      } else {
+        assignedRole = '공통전담간호사 (배정정보 없음)';
+        assignedPerson = '당직표 확인 요망';
+        notes = notes || '해당 시간대나 병동에 관리자가 배정한 공통전담간호사 정보가 없습니다.';
+      }
     }
   } 
   // 임상병리사 일정 매칭

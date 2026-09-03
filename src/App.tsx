@@ -6,11 +6,11 @@ import {
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
-  initialDutyRoles, initialDutyPhones
+  initialDutyRoles, initialDutyPhones, initialCNGroupSchedules
 } from './data/initialData';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule 
 } from './types';
 import { 
   GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
@@ -28,7 +28,8 @@ const STORAGE_KEYS = {
   PATHOLOGISTS: 'hcs_pathologists_v1',
   SHEETS_CONFIG: 'hcs_sheets_config_v1',
   DUTY_ROLES: 'hcs_duty_roles_v1',
-  DUTY_PHONES: 'hcs_duty_phones_v1'
+  DUTY_PHONES: 'hcs_duty_phones_v1',
+  CN_GROUP_SCHEDULES: 'hcs_cn_group_schedules_v1'
 };
 
 export default function App() {
@@ -95,6 +96,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialDutyPhones;
   });
 
+  const [cnGroupSchedules, setCnGroupSchedules] = useState<CNGroupSchedule[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CN_GROUP_SCHEDULES);
+    return saved ? JSON.parse(saved) : initialCNGroupSchedules;
+  });
+
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
@@ -110,6 +116,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.DUTY_PHONES, JSON.stringify(dutyPhones));
   }, [dutyPhones]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CN_GROUP_SCHEDULES, JSON.stringify(cnGroupSchedules));
+  }, [cnGroupSchedules]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
@@ -206,6 +216,7 @@ export default function App() {
     setSheetsConfig(DEFAULT_SHEETS_CONFIG);
     setDutyRoles(initialDutyRoles);
     setDutyPhones(initialDutyPhones);
+    setCnGroupSchedules(initialCNGroupSchedules);
   };
 
   return (
@@ -235,6 +246,7 @@ export default function App() {
             customRules={customRules}
             pathologistSchedules={pathologistSchedules}
             dutyPhones={dutyPhones}
+            cnGroupSchedules={cnGroupSchedules}
             sheetsConfig={sheetsConfig}
             onSyncSheets={() => handleSyncSheets()}
             isSyncingSheets={isSyncingSheets}
@@ -265,6 +277,8 @@ export default function App() {
             setDutyRoles={setDutyRoles}
             dutyPhones={dutyPhones}
             setDutyPhones={setDutyPhones}
+            cnGroupSchedules={cnGroupSchedules}
+            setCnGroupSchedules={setCnGroupSchedules}
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}

@@ -1,6 +1,7 @@
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  EmergencyContact, TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem 
+  EmergencyContact, TaskItem, CustomRule, InternDoctor, PathologistSchedule, 
+  DutyPhoneItem, CNGroupSchedule, CNShiftCell 
 } from '../types';
 
 export const DEPARTMENTS = ['내과', '비내과'] as const;
@@ -312,6 +313,96 @@ for (let i = 0; i < 7; i++) {
     'ts_night': { 'CN1': '정나잇', 'CN2': '강나잇', 'CN3': '한나잇', 'CN4': '오나잇', 'CN5': '서나잇' }
   };
 }
+
+// 공통전담간호사 시간대별/요일별 근무표 (이미지 2 공식 양식 완벽 반영)
+export const initialCNGroupSchedules: CNGroupSchedule[] = [
+  {
+    id: 'cng-1',
+    title: '9/1 ~ 공통 전담간호사 근무',
+    wards: ['42', '72', '121W', 'AKU', 'DR', 'DSR', '42병동', '72병동', '121병동'],
+    dayTypes: {
+      1: '공휴일-정상진료',
+      2: '공휴일-정상진료',
+      3: '공휴일-정상진료',
+      4: '공휴일-정상진료',
+      5: '공휴일-정상진료',
+      6: '공휴일',
+      0: '공휴일'
+    },
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
+        2: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
+        3: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }, // Image 2: 5-4011 (DUMC: 공통전담2 4)
+        4: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
+        5: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' },
+        6: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }, // Image 2 토: 5-4011
+        0: { role: '공통전담2 4', ucap: '5-4011', phone: '010-1000-2004' }  // Image 2 일: 5-4011
+      },
+      'ts_eve': {
+        1: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
+        2: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
+        3: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' }, // Image 2 수: 5-4006 (DUMC: 공통전담2 3)
+        4: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
+        5: { role: '공통전담2 3', ucap: '5-4006', phone: '010-1000-2003' },
+        6: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
+        0: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }
+      },
+      'ts_night': {
+        1: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
+        2: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
+        3: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }, // Image 2 수: 5-4004 (DUMC: 공통전담2 2)
+        4: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
+        5: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' },
+        6: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }, // Image 2 토: 5-4004
+        0: { role: '공통전담2 2', ucap: '5-4004', phone: '010-1000-2002' }  // Image 2 일: 5-4004
+      }
+    }
+  },
+  {
+    id: 'cng-2',
+    title: '공통 전담간호사 2조 (병동 일반)',
+    wards: ['61', '62', '81', '82', '61병동', '62병동', '81병동', '82병동'],
+    dayTypes: {
+      1: '평일',
+      2: '평일',
+      3: '평일',
+      4: '평일',
+      5: '평일',
+      6: '주말/공휴일',
+      0: '주말/공휴일'
+    },
+    schedule: {
+      'ts_day': {
+        1: { role: '공통전담 1', ucap: '53001' },
+        2: { role: '공통전담 1', ucap: '53001' },
+        3: { role: '공통전담 1', ucap: '53001' },
+        4: { role: '공통전담 1', ucap: '53001' },
+        5: { role: '공통전담 1', ucap: '53001' },
+        6: { role: '공통전담 1', ucap: '53001' },
+        0: { role: '공통전담 1', ucap: '53001' }
+      },
+      'ts_eve': {
+        1: { role: '공통전담 2', ucap: '53002' },
+        2: { role: '공통전담 2', ucap: '53002' },
+        3: { role: '공통전담 2', ucap: '53002' },
+        4: { role: '공통전담 2', ucap: '53002' },
+        5: { role: '공통전담 2', ucap: '53002' },
+        6: { role: '공통전담 2', ucap: '53002' },
+        0: { role: '공통전담 2', ucap: '53002' }
+      },
+      'ts_night': {
+        1: { role: '공통전담 3', ucap: '53003' },
+        2: { role: '공통전담 3', ucap: '53003' },
+        3: { role: '공통전담 3', ucap: '53003' },
+        4: { role: '공통전담 3', ucap: '53003' },
+        5: { role: '공통전담 3', ucap: '53003' },
+        6: { role: '공통전담 3', ucap: '53003' },
+        0: { role: '공통전담 3', ucap: '53003' }
+      }
+    }
+  }
+];
 
 export const emergencyContacts: EmergencyContact[] = [
   { id: 'em-1', name: '응급의학과 메인', dept: '응급실', ucap: '5-1119', phone: '010-8888-1119', category: 'ER' },

@@ -10,7 +10,8 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory, DutyPhoneItem 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory, 
+  DutyPhoneItem, CNGroupSchedule, CNShiftCell 
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
@@ -42,6 +43,8 @@ interface AdminViewProps {
   setDutyRoles: React.Dispatch<React.SetStateAction<string[]>>;
   dutyPhones: DutyPhoneItem[];
   setDutyPhones: React.Dispatch<React.SetStateAction<DutyPhoneItem[]>>;
+  cnGroupSchedules?: CNGroupSchedule[];
+  setCnGroupSchedules?: React.Dispatch<React.SetStateAction<CNGroupSchedule[]>>;
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
@@ -60,14 +63,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
   sheetsConfig, setSheetsConfig,
   dutyRoles, setDutyRoles,
   dutyPhones, setDutyPhones,
+  cnGroupSchedules = [],
+  setCnGroupSchedules,
   onSyncSheets, isSyncingSheets,
   onResetData
 }) => {
   const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
   const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
   const [dutyPhoneDeptFilter, setDutyPhoneDeptFilter] = useState<'ALL' | '내과' | '비내과'>('ALL');
-  const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('schedule');
+  const [adminCNSubTab, setAdminCNSubTab] = useState<'schedule' | 'wards' | 'timeslot'>('schedule');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(cnGroupSchedules?.[0]?.id || 'cng-1');
   const [editingWardsPostId, setEditingWardsPostId] = useState<string | null>(null);
+  const [editingGroupWardsId, setEditingGroupWardsId] = useState<string | null>(null);
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number>(1); // 1 = Monday
   const [newDateInput, setNewDateInput] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -342,6 +349,85 @@ export const AdminView: React.FC<AdminViewProps> = ({
       const updatedWards = exists ? p.wards.filter(w => w !== ward) : [...p.wards, ward];
       return { ...p, wards: updatedWards };
     }));
+  };
+
+  // --- Image 2 Timetable (CNGroupSchedule) Handlers ---
+  const handleUpdateCNGroupCell = (groupId: string, timeSlotId: string, dayOfWeek: number, field: keyof CNShiftCell, value: string) => {
+    if (!setCnGroupSchedules) return;
+    setCnGroupSchedules(prev => prev.map(group => {
+      if (group.id !== groupId) return group;
+      const currentSlot = group.schedule[timeSlotId] || {};
+      const currentCell = currentSlot[dayOfWeek] || { role: '', ucap: '' };
+      return {
+        ...group,
+        schedule: {
+          ...group.schedule,
+          [timeSlotId]: {
+            ...currentSlot,
+            [dayOfWeek]: {
+              ...currentCell,
+              [field]: value
+            }
+          }
+        }
+      };
+    }));
+  };
+
+  const handleUpdateCNGroupTitle = (groupId: string, newTitle: string) => {
+    if (!setCnGroupSchedules) return;
+    setCnGroupSchedules(prev => prev.map(g => g.id === groupId ? { ...g, title: newTitle } : g));
+  };
+
+  const handleToggleWardForGroup = (groupId: string, ward: string) => {
+    if (!setCnGroupSchedules) return;
+    setCnGroupSchedules(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      const exists = g.wards.includes(ward);
+      return {
+        ...g,
+        wards: exists ? g.wards.filter(w => w !== ward) : [...g.wards, ward]
+      };
+    }));
+  };
+
+  const handleAddCNGroup = () => {
+    if (!setCnGroupSchedules) return;
+    const nextNum = (cnGroupSchedules?.length || 0) + 1;
+    const newId = `cng-${Date.now()}`;
+    const newGroup: CNGroupSchedule = {
+      id: newId,
+      title: `공통 전담간호사 ${nextNum}조 근무`,
+      wards: [],
+      dayTypes: { 1: '공휴일-정상진료', 2: '공휴일-정상진료', 3: '공휴일-정상진료', 4: '공휴일-정상진료', 5: '공휴일-정상진료', 6: '공휴일', 0: '공휴일' },
+      schedule: {
+        'ts_day': {
+          1: { role: '공통전담 1', ucap: '53001' }, 2: { role: '공통전담 1', ucap: '53001' }, 3: { role: '공통전담 1', ucap: '53001' },
+          4: { role: '공통전담 1', ucap: '53001' }, 5: { role: '공통전담 1', ucap: '53001' }, 6: { role: '공통전담 1', ucap: '53001' }, 0: { role: '공통전담 1', ucap: '53001' }
+        },
+        'ts_eve': {
+          1: { role: '공통전담 2', ucap: '53002' }, 2: { role: '공통전담 2', ucap: '53002' }, 3: { role: '공통전담 2', ucap: '53002' },
+          4: { role: '공통전담 2', ucap: '53002' }, 5: { role: '공통전담 2', ucap: '53002' }, 6: { role: '공통전담 2', ucap: '53002' }, 0: { role: '공통전담 2', ucap: '53002' }
+        },
+        'ts_night': {
+          1: { role: '공통전담 3', ucap: '53003' }, 2: { role: '공통전담 3', ucap: '53003' }, 3: { role: '공통전담 3', ucap: '53003' },
+          4: { role: '공통전담 3', ucap: '53003' }, 5: { role: '공통전담 3', ucap: '53003' }, 6: { role: '공통전담 3', ucap: '53003' }, 0: { role: '공통전담 3', ucap: '53003' }
+        }
+      }
+    };
+    setCnGroupSchedules(prev => [...prev, newGroup]);
+    setSelectedGroupId(newId);
+    showSaveSuccess(`새 근무표 그룹(${newGroup.title})이 추가되었습니다.`);
+  };
+
+  const handleDeleteCNGroup = (groupId: string, title: string) => {
+    if (!setCnGroupSchedules) return;
+    if (confirm(`'${title}' 근무표 그룹을 삭제하시겠습니까?`)) {
+      setCnGroupSchedules(prev => prev.filter(g => g.id !== groupId));
+      const remaining = cnGroupSchedules?.filter(g => g.id !== groupId) || [];
+      if (remaining.length > 0) setSelectedGroupId(remaining[0].id);
+      showSaveSuccess('근무표 그룹이 삭제되었습니다.');
+    }
   };
 
   // --- Task Master Handlers ---
@@ -2336,116 +2422,243 @@ export const AdminView: React.FC<AdminViewProps> = ({
           {/* ================================================================ */}
           {/* 3. SUB-TAB: WEEKLY SHIFT MATRIX SCHEDULE INPUT                   */}
           {/* ================================================================ */}
-          {adminCNSubTab === 'schedule' && (
-            <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-5">
-              
-              {/* Top Controls: Day of Week & Quick Links */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-cyan-400" />
-                    요일별 전담간호사 근무자 입력
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    해당 요일에 각 포스트 및 교대시간별로 근무할 간호사 이름을 직접 입력합니다.
-                  </p>
-                </div>
+          {/* ================================================================ */}
+          {/* 3. SUB-TAB: IMAGE 2 TIMETABLE MATRIX (시간대별 × 요일별)           */}
+          {/* ================================================================ */}
+          {adminCNSubTab === 'schedule' && (() => {
+            const currentGroup = cnGroupSchedules?.find(g => g.id === selectedGroupId) || cnGroupSchedules?.[0];
+            const IMAGE2_DAYS = [
+              { day: 1, name: '월', isWeekend: false },
+              { day: 2, name: '화', isWeekend: false },
+              { day: 3, name: '수', isWeekend: false },
+              { day: 4, name: '목', isWeekend: false },
+              { day: 5, name: '금', isWeekend: false },
+              { day: 6, name: '토', isWeekend: true },
+              { day: 0, name: '일', isWeekend: true }
+            ];
 
-                {/* Day of Week Selector */}
-                <div className="flex items-center gap-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
-                  {DAYS_OF_WEEK.map((dayName, idx) => (
-                    <button
-                      key={dayName}
-                      onClick={() => setSelectedDayOfWeek(idx)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        selectedDayOfWeek === idx
-                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {dayName.substring(0, 1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Matrix Table */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-800">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-900 text-slate-300 font-bold uppercase tracking-wider">
-                    <tr>
-                      <th className="p-3 w-48">담당 포스트 (공용 UCAP / 핸드폰)</th>
-                      <th className="p-3 w-44">관할 병동</th>
-                      {timeSlots.map(ts => (
-                        <th key={ts.id} className="p-3">
-                          <div className="flex items-center gap-1.5">
-                            <span>{ts.name}</span>
-                            <span className="text-[10px] text-cyan-400 font-mono font-normal">
-                              ({ts.start} ~ {ts.end})
-                            </span>
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-medium">
-                    {cnPosts.map(post => (
-                      <tr key={post.id} className="hover:bg-slate-900/40 transition">
-                        {/* 담당 포스트 & 연락처 */}
-                        <td className="p-3">
-                          <div className="font-extrabold text-cyan-300 text-xs">{post.name}</div>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 font-mono">
-                            <span>UCAP: <strong className="text-white">{post.ucap}</strong></span>
-                            {post.phone && <span>· 폰: {post.phone}</span>}
-                          </div>
-                        </td>
-
-                        {/* 관할 병동 */}
-                        <td className="p-3 text-slate-300">
-                          {post.wards.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {post.wards.map(w => (
-                                <span key={w} className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
-                                  {w}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-slate-500 italic">미배정 (병동 설정 요망)</span>
-                          )}
-                        </td>
-
-                        {/* 교대별 간호사 이름 인풋 */}
-                        {timeSlots.map(ts => (
-                          <td key={ts.id} className="p-2">
-                            <input
-                              type="text"
-                              value={weeklyCNSchedule[selectedDayOfWeek]?.[ts.id]?.[post.id] || ''}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setWeeklyCNSchedule(prev => ({
-                                  ...prev,
-                                  [selectedDayOfWeek]: {
-                                    ...prev[selectedDayOfWeek],
-                                    [ts.id]: {
-                                      ...(prev[selectedDayOfWeek]?.[ts.id] || {}),
-                                      [post.id]: val
-                                    }
-                                  }
-                                }));
-                              }}
-                              placeholder="근무자명"
-                              className="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 focus:bg-slate-900"
-                            />
-                          </td>
-                        ))}
-                      </tr>
+            return (
+              <div className="space-y-4">
+                
+                {/* Ward Groups Selector Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-950/80 rounded-2xl border border-slate-800">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {cnGroupSchedules?.map((grp, idx) => (
+                      <button
+                        key={grp.id}
+                        onClick={() => setSelectedGroupId(grp.id)}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                          selectedGroupId === grp.id
+                            ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        <span>📌 {grp.title.split(' ')[0]} {grp.title.split(' ')[1] || `그룹 ${idx + 1}`}</span>
+                        {grp.wards.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded bg-black/30 text-[10px] font-mono">
+                            {grp.wards.slice(0, 3).join(', ')}{grp.wards.length > 3 ? '...' : ''}
+                          </span>
+                        )}
+                      </button>
                     ))}
-                  </tbody>
-                </table>
+
+                    <button
+                      onClick={handleAddCNGroup}
+                      className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-dashed border-cyan-800/60 transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      새 근무표 그룹 추가
+                    </button>
+                  </div>
+
+                  {cnGroupSchedules && cnGroupSchedules.length > 1 && currentGroup && (
+                    <button
+                      onClick={() => handleDeleteCNGroup(currentGroup.id, currentGroup.title)}
+                      className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-rose-400 transition"
+                      title="현재 근무표 그룹 삭제"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {currentGroup ? (
+                  <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-2xl space-y-4">
+                    
+                    {/* Image 2 Top Header: Title (Left) and Wards List (Right) */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Edit3 className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <input
+                          type="text"
+                          value={currentGroup.title}
+                          onChange={e => handleUpdateCNGroupTitle(currentGroup.id, e.target.value)}
+                          placeholder="근무표 명칭 (예: 9/1 ~ 공통 전담간호사 근무)"
+                          className="bg-transparent text-base sm:text-lg font-black text-white focus:outline-none focus:border-b-2 focus:border-cyan-400 w-full sm:w-80"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-400 font-bold">관할 병동:</span>
+                        <div className="flex flex-wrap items-center gap-1 font-mono text-xs font-extrabold text-cyan-300">
+                          {currentGroup.wards.length > 0 ? (
+                            currentGroup.wards.map(w => (
+                              <span key={w} className="px-2 py-0.5 rounded-lg bg-cyan-950 border border-cyan-800/50">
+                                {w}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-500 italic">미배정</span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => setEditingGroupWardsId(currentGroup.id)}
+                          className="px-3 py-1 rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition"
+                        >
+                          + 병동 설정/선택
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick helper tip */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                      <span>💡 각 셀에 <strong>UCAP 번호</strong>와 <strong>공통전담(1, 2, 3...)</strong> 명칭을 직접 입력하거나 하단 빠른 채우기 버튼을 클릭하세요.</span>
+                      <span className="text-amber-400/90 font-semibold">* 공식 엑셀 서식(이미지 2) 동일 구현</span>
+                    </div>
+
+                    {/* Image 2 Timetable Table */}
+                    <div className="overflow-x-auto rounded-2xl border-2 border-slate-700 bg-slate-950">
+                      <table className="w-full text-xs text-center border-collapse">
+                        {/* Header Row 1: 시간 & 요일 */}
+                        <thead>
+                          <tr className="bg-slate-900 border-b-2 border-slate-700 text-white font-extrabold">
+                            <th className="p-3 w-36 border-r border-slate-700 text-sm">시간</th>
+                            {IMAGE2_DAYS.map(d => (
+                              <th 
+                                key={d.day} 
+                                className={`p-3 border-r border-slate-700 text-sm min-w-[130px] ${
+                                  d.name === '일' ? 'text-rose-300' : (d.name === '토' ? 'text-cyan-300' : 'text-slate-200')
+                                }`}
+                              >
+                                {d.name}
+                              </th>
+                            ))}
+                          </tr>
+
+                          {/* Header Row 2: Green Status Bar (공휴일-정상진료 / 공휴일) */}
+                          <tr className="border-b-2 border-slate-700">
+                            <th className="bg-slate-900/90 border-r border-slate-700"></th>
+                            <th 
+                              colSpan={5} 
+                              className="py-1.5 px-3 bg-emerald-700/80 text-emerald-100 font-bold text-xs border-r border-slate-700 tracking-wide"
+                            >
+                              공휴일-정상진료
+                            </th>
+                            <th 
+                              colSpan={2} 
+                              className="py-1.5 px-3 bg-emerald-700/80 text-emerald-100 font-bold text-xs tracking-wide"
+                            >
+                              공휴일
+                            </th>
+                          </tr>
+                        </thead>
+
+                        {/* Data Rows by TimeSlot (Day, Evening, Night) */}
+                        <tbody className="divide-y border-slate-700 font-medium">
+                          {timeSlots.map(ts => (
+                            <tr key={ts.id} className="divide-x border-slate-700">
+                              
+                              {/* Left Column: Time (06:30~14:30 / 14:30~22:00 / 22:00~06:30) */}
+                              <td className="p-3 font-mono font-black text-xs text-amber-300 bg-amber-950/30 border-r-2 border-slate-700 whitespace-nowrap">
+                                <div className="text-amber-200">{ts.start}~{ts.end}</div>
+                                <span className="text-[10px] text-amber-400/70 font-normal font-sans block mt-0.5">
+                                  {ts.name}
+                                </span>
+                              </td>
+
+                              {/* 7 Days Columns */}
+                              {IMAGE2_DAYS.map(d => {
+                                const cell = currentGroup.schedule?.[ts.id]?.[d.day] || { role: '', ucap: '' };
+                                const isFilled = Boolean(cell.ucap || cell.role);
+
+                                return (
+                                  <td 
+                                    key={d.day} 
+                                    className={`p-2 relative transition group ${
+                                      isFilled 
+                                        ? 'bg-amber-950/20 hover:bg-amber-950/30 border-amber-900/30' 
+                                        : 'hover:bg-slate-900/60'
+                                    }`}
+                                  >
+                                    <div className="space-y-1.5">
+                                      {/* UCAP Input */}
+                                      <input
+                                        type="text"
+                                        value={cell.ucap || ''}
+                                        placeholder="UCAP (5-4011)"
+                                        onChange={e => handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', e.target.value)}
+                                        className={`w-full text-center font-mono font-bold text-xs px-1 py-1 rounded bg-slate-900/80 border focus:outline-none transition ${
+                                          cell.ucap ? 'text-cyan-300 border-cyan-800/60 font-black' : 'text-slate-400 border-slate-800 focus:border-cyan-500'
+                                        }`}
+                                      />
+
+                                      {/* Role / Post Name Input */}
+                                      <input
+                                        type="text"
+                                        value={cell.role || ''}
+                                        placeholder="공통전담 1"
+                                        onChange={e => handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', e.target.value)}
+                                        className={`w-full text-center text-[11px] px-1 py-0.5 rounded bg-slate-900/80 border focus:outline-none transition ${
+                                          cell.role ? 'text-amber-200 font-bold border-amber-800/60' : 'text-slate-400 border-slate-800 focus:border-cyan-500'
+                                        }`}
+                                      />
+
+                                      {/* Quick Fill Helpers (Hover Toolbar) */}
+                                      <div className="flex items-center justify-center gap-1 opacity-20 group-hover:opacity-100 transition pt-1">
+                                        {cnPosts.slice(0, 4).map(p => (
+                                          <button
+                                            key={p.id}
+                                            onClick={() => {
+                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', p.name);
+                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', p.ucap);
+                                            }}
+                                            className="px-1 py-0.5 rounded bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-[9px] text-slate-300 font-mono transition"
+                                            title={`${p.name} (${p.ucap}) 채우기`}
+                                          >
+                                            {p.name.replace('공통전담', '')}
+                                          </button>
+                                        ))}
+                                        {isFilled && (
+                                          <button
+                                            onClick={() => {
+                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'role', '');
+                                              handleUpdateCNGroupCell(currentGroup.id, ts.id, d.day, 'ucap', '');
+                                            }}
+                                            className="px-1 py-0.5 rounded bg-rose-950 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] transition"
+                                            title="셀 비우기"
+                                          >
+                                            ×
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                  </div>
+                ) : null}
+
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ================================================================ */}
           {/* MODAL: WARD SELECTION POPOVER / MODAL                            */}
@@ -2498,6 +2711,64 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </span>
                   <button
                     onClick={() => setEditingWardsPostId(null)}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20"
+                  >
+                    선택 완료
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: GROUP WARD SELECTION POPOVER / MODAL */}
+          {editingGroupWardsId && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-cyan-400" />
+                      관할 병동 선택 - {cnGroupSchedules?.find(g => g.id === editingGroupWardsId)?.title}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      해당 근무표 그룹이 담당할 병동을 클릭하여 선택하거나 해제하세요.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEditingGroupWardsId(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Ward Chips Grid */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto p-1">
+                  {ALL_WARDS.map(ward => {
+                    const currentGrp = cnGroupSchedules?.find(g => g.id === editingGroupWardsId);
+                    const isSelected = currentGrp?.wards.includes(ward);
+                    return (
+                      <button
+                        key={ward}
+                        onClick={() => handleToggleWardForGroup(editingGroupWardsId, ward)}
+                        className={`p-2.5 rounded-xl text-xs font-bold text-center transition border ${
+                          isSelected
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        {ward}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <span className="text-xs text-slate-400">
+                    선택된 병동 수: <strong className="text-cyan-400">{cnGroupSchedules?.find(g => g.id === editingGroupWardsId)?.wards.length || 0}개</strong>
+                  </span>
+                  <button
+                    onClick={() => setEditingGroupWardsId(null)}
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20"
                   >
                     선택 완료
