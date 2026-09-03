@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { UserView } from './components/UserView';
 import { AdminView } from './components/AdminView';
@@ -11,6 +11,9 @@ import {
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
   TaskItem, CustomRule, InternDoctor, PathologistSchedule 
 } from './types';
+import { 
+  GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
+} from './utils/googleSheetsSync';
 
 const STORAGE_KEYS = {
   SCHEDULES: 'hcs_schedules_v1',
@@ -21,7 +24,8 @@ const STORAGE_KEYS = {
   TASKS: 'hcs_tasks_v1',
   CUSTOM_RULES: 'hcs_custom_rules_v1',
   INTERNS: 'hcs_interns_v1',
-  PATHOLOGISTS: 'hcs_pathologists_v1'
+  PATHOLOGISTS: 'hcs_pathologists_v1',
+  SHEETS_CONFIG: 'hcs_sheets_config_v1'
 };
 
 export default function App() {
@@ -73,6 +77,14 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialPathologistSchedules;
   });
 
+  const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SHEETS_CONFIG);
+    return saved ? JSON.parse(saved) : DEFAULT_SHEETS_CONFIG;
+  });
+
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
   // Sync state to LocalStorage on change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(schedules));
@@ -110,6 +122,54 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.PATHOLOGISTS, JSON.stringify(pathologistSchedules));
   }, [pathologistSchedules]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsConfig));
+  }, [sheetsConfig]);
+
+  // Google Sheets Sync Action
+  const handleSyncSheets = useCallback(async (customUrl?: string, customName?: string) => {
+    const targetUrl = customUrl || sheetsConfig.sheetUrl;
+    const targetName = customName || sheetsConfig.sheetName || '당직표';
+    if (!targetUrl) return;
+
+    setIsSyncingSheets(true);
+    const result = await fetchGoogleSheetSchedules(targetUrl, targetName);
+    setIsSyncingSheets(false);
+
+    if (result.success) {
+      setSchedules(prev => ({ ...prev, ...result.schedules }));
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setSheetsConfig(prev => ({
+        ...prev,
+        enabled: true,
+        sheetUrl: targetUrl,
+        sheetName: targetName,
+        lastSyncedAt: nowStr
+      }));
+      setSyncToastMessage(result.message);
+      setTimeout(() => setSyncToastMessage(null), 3500);
+    } else {
+      setSyncToastMessage(result.message);
+      setTimeout(() => setSyncToastMessage(null), 5000);
+    }
+  }, [sheetsConfig]);
+
+  // Periodic Auto-Sync Effect
+  useEffect(() => {
+    if (!sheetsConfig.enabled || !sheetsConfig.sheetUrl) return;
+
+    // Initial sync on app start
+    handleSyncSheets();
+
+    // Auto-sync interval
+    const intervalMinutes = Math.max(1, sheetsConfig.autoSyncMinutes || 5);
+    const timer = setInterval(() => {
+      handleSyncSheets();
+    }, intervalMinutes * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, [sheetsConfig.enabled, sheetsConfig.sheetUrl, sheetsConfig.autoSyncMinutes, handleSyncSheets]);
+
   const handleResetData = () => {
     Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
 
@@ -122,11 +182,20 @@ export default function App() {
     setCustomRules(initialCustomRules);
     setInterns(initialInterns);
     setPathologistSchedules(initialPathologistSchedules);
+    setSheetsConfig(DEFAULT_SHEETS_CONFIG);
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-cyan-500 selection:text-white">
       
+      {/* Global Sync Toast Notification */}
+      {syncToastMessage && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-2.5 bg-cyan-700 text-white px-5 py-3 rounded-2xl shadow-2xl animate-fade-in text-xs sm:text-sm font-bold border border-cyan-400">
+          <span className="w-2 h-2 rounded-full bg-cyan-300 animate-ping"></span>
+          {syncToastMessage}
+        </div>
+      )}
+
       {/* Header Bar */}
       <Header view={view} setView={setView} onResetData={handleResetData} />
 
@@ -142,6 +211,9 @@ export default function App() {
             tasks={tasks}
             customRules={customRules}
             pathologistSchedules={pathologistSchedules}
+            sheetsConfig={sheetsConfig}
+            onSyncSheets={() => handleSyncSheets()}
+            isSyncingSheets={isSyncingSheets}
           />
         ) : (
           <AdminView
@@ -163,6 +235,10 @@ export default function App() {
             setInterns={setInterns}
             pathologistSchedules={pathologistSchedules}
             setPathologistSchedules={setPathologistSchedules}
+            sheetsConfig={sheetsConfig}
+            setSheetsConfig={setSheetsConfig}
+            onSyncSheets={handleSyncSheets}
+            isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}
           />
         )}
@@ -177,9 +253,16 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="hover:text-slate-300 transition">보안 레벨: 최고 (SSL Encrypted)</span>
+            {sheetsConfig.enabled ? (
+              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                구글 시트 실시간 연동 활성
+              </span>
+            ) : (
+              <span className="text-slate-500">로컬 데이터 모드</span>
+            )}
             <span>•</span>
-            <span className="hover:text-slate-300 transition">로컬 데이터 자동동기화 활성화</span>
+            <span className="hover:text-slate-300 transition">보안 레벨: 최고 (SSL Encrypted)</span>
           </div>
         </div>
       </footer>

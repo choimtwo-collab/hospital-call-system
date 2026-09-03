@@ -12,6 +12,7 @@ import {
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
   SearchResult, TaskItem, CustomRule, PathologistSchedule 
 } from '../types';
+import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
 import { checkKoreanHoliday } from '../utils/koreanHolidays';
 
@@ -24,6 +25,9 @@ interface UserViewProps {
   tasks: TaskItem[];
   customRules: CustomRule[];
   pathologistSchedules: PathologistSchedule[];
+  sheetsConfig: GoogleSheetsConfig;
+  onSyncSheets: () => void;
+  isSyncingSheets: boolean;
 }
 
 const MY_WARD_KEY = 'hcs_my_default_ward';
@@ -36,7 +40,10 @@ export const UserView: React.FC<UserViewProps> = ({
   weeklyCNSchedule,
   tasks,
   customRules,
-  pathologistSchedules
+  pathologistSchedules,
+  sheetsConfig,
+  onSyncSheets,
+  isSyncingSheets
 }) => {
   const initialIso = getLocalISOString();
   const initialDate = initialIso.split('T')[0];
@@ -129,6 +136,34 @@ export const UserView: React.FC<UserViewProps> = ({
   return (
     <div className="space-y-6">
       
+      {/* Google Sheets Live Sync Banner */}
+      {sheetsConfig.enabled && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-xl text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <div>
+              <span className="font-extrabold text-emerald-300 block sm:inline">
+                구글 스프레드시트 실시간 연동 활성화
+              </span>
+              {sheetsConfig.lastSyncedAt && (
+                <span className="text-slate-400 text-[11px] sm:ml-2">
+                  (마지막 자동 동기화: {sheetsConfig.lastSyncedAt})
+                </span>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={onSyncSheets}
+            disabled={isSyncingSheets}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-500/40 transition text-[11px] disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+            {isSyncingSheets ? '동기화 중...' : '지금 최신 당직표 새로고침'}
+          </button>
+        </div>
+      )}
+
       {/* Quick Scenario Preset Chips */}
       <div className="flex flex-wrap items-center gap-2 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
         <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 px-2">

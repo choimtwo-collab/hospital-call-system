@@ -3,7 +3,7 @@ import {
   Settings, Users, Calendar, Phone, Plus, Trash2, Grid, Clock, 
   RotateCcw, Download, Upload, Save, CheckCircle2, AlertCircle, Search,
   FileSpreadsheet, Sliders, Tag, ArrowRight, Shield, ToggleLeft, ToggleRight,
-  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X
+  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw
 } from 'lucide-react';
 import { 
   ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS 
@@ -13,6 +13,7 @@ import {
   TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory 
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
+import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 
 interface AdminViewProps {
   schedules: DateScheduleMap;
@@ -33,6 +34,10 @@ interface AdminViewProps {
   setInterns: React.Dispatch<React.SetStateAction<InternDoctor[]>>;
   pathologistSchedules: PathologistSchedule[];
   setPathologistSchedules: React.Dispatch<React.SetStateAction<PathologistSchedule[]>>;
+  sheetsConfig: GoogleSheetsConfig;
+  setSheetsConfig: React.Dispatch<React.SetStateAction<GoogleSheetsConfig>>;
+  onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
+  isSyncingSheets: boolean;
   onResetData: () => void;
 }
 
@@ -46,14 +51,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
   customRules, setCustomRules,
   interns, setInterns,
   pathologistSchedules, setPathologistSchedules,
+  sheetsConfig, setSheetsConfig,
+  onSyncSheets, isSyncingSheets,
   onResetData
 }) => {
-  const [adminTab, setAdminTab] = useState<'schedules' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
+  const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
   const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('timeslot');
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number>(1); // 1 = Monday
   const [newDateInput, setNewDateInput] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // 구글 시트 연동 폼 상태
+  const [sheetUrlInput, setSheetUrlInput] = useState<string>(sheetsConfig.sheetUrl);
+  const [sheetNameInput, setSheetNameInput] = useState<string>(sheetsConfig.sheetName || '당직표');
+  const [autoSyncInput, setAutoSyncInput] = useState<number>(sheetsConfig.autoSyncMinutes || 5);
 
   // 엑셀 업로드 상태
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,6 +280,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
         >
           <Calendar className="w-4 h-4" />
           당직표 관리 & 엑셀 업로드
+        </button>
+
+        <button
+          onClick={() => setAdminTab('sheets')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+            adminTab === 'sheets'
+              ? 'bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          구글 시트 실시간 연동
+          {sheetsConfig.enabled && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          )}
         </button>
 
         <button
@@ -504,6 +531,244 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* TAB: GOOGLE SHEETS LIVE SYNC                                        */}
+      {/* ==================================================================== */}
+      {adminTab === 'sheets' && (
+        <div className="space-y-6">
+          
+          {/* Header Hero Card */}
+          <div className="glass-panel p-6 rounded-3xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950/30 via-slate-900 to-slate-900 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                  구글 스프레드시트(Google Sheets) 실시간 연동
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                  병원에서 관리하는 <strong>구글 시트의 링크</strong>만 등록해 두면, 관리자가 웹 화면에 들어올 필요 없이 평소처럼 <strong>구글 시트에서 당직자 이름을 수정하는 즉시 모든 병동 PC/모바일 간호사 화면에 최신 당직표가 실시간으로 자동 동기화</strong>됩니다.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shrink-0">
+                <span className={`w-3 h-3 rounded-full ${sheetsConfig.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`}></span>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-slate-400">실시간 연동 상태</div>
+                  <div className={`text-xs font-black ${sheetsConfig.enabled ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {sheetsConfig.enabled ? '활성화 (실시간 자동 갱신)' : '비활성화 (로컬 모드)'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {sheetsConfig.lastSyncedAt && (
+              <div className="text-[11px] text-slate-400 flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>마지막 성공 동기화 시각: <strong className="text-white">{sheetsConfig.lastSyncedAt}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* Sync Setting Form Card */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-5">
+            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Settings className="w-4 h-4 text-emerald-400" />
+              구글 시트 연동 설정
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 text-xs">
+              
+              {/* Sheet URL Input */}
+              <div className="md:col-span-8 space-y-1.5">
+                <label className="font-bold text-slate-300 block">
+                  1. 구글 스프레드시트 공유 링크(URL) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={sheetUrlInput}
+                  onChange={e => setSheetUrlInput(e.target.value)}
+                  placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5.../edit"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 font-mono"
+                />
+                <span className="text-[11px] text-slate-500 block">
+                  브라우저 주소창의 구글 시트 주소 전체를 그대로 복사하여 붙여넣으시면 됩니다.
+                </span>
+              </div>
+
+              {/* Sheet Name Input */}
+              <div className="md:col-span-4 space-y-1.5">
+                <label className="font-bold text-slate-300 block">
+                  2. 시트(탭) 이름
+                </label>
+                <input
+                  type="text"
+                  value={sheetNameInput}
+                  onChange={e => setSheetNameInput(e.target.value)}
+                  placeholder="예: 당직표"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                />
+                <span className="text-[11px] text-slate-500 block">
+                  구글 시트 하단 탭 이름 (기본값: 당직표)
+                </span>
+              </div>
+
+              {/* Auto Sync Interval */}
+              <div className="md:col-span-6 space-y-1.5">
+                <label className="font-bold text-slate-300 block">
+                  3. 자동 동기화 주기 (주기적 새로고침)
+                </label>
+                <select
+                  value={autoSyncInput}
+                  onChange={e => setAutoSyncInput(parseInt(e.target.value, 10))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                >
+                  <option value={1}>1분마다 자동 새로고침 (가장 빠름)</option>
+                  <option value={3}>3분마다 자동 새로고침</option>
+                  <option value={5}>5분마다 자동 새로고침 (추천)</option>
+                  <option value={10}>10분마다 자동 새로고침</option>
+                  <option value={30}>30분마다 자동 새로고침</option>
+                </select>
+                <span className="text-[11px] text-slate-500 block">
+                  모든 간호사 브라우저에서 지정한 주기마다 구글 시트 최신 데이터를 백그라운드로 가져옵니다.
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="md:col-span-6 flex flex-col justify-end gap-2 pt-2 sm:pt-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (!sheetUrlInput.trim()) {
+                        alert('구글 시트 URL을 입력해주세요.');
+                        return;
+                      }
+                      onSyncSheets(sheetUrlInput.trim(), sheetNameInput.trim());
+                      setSheetsConfig(prev => ({
+                        ...prev,
+                        enabled: true,
+                        sheetUrl: sheetUrlInput.trim(),
+                        sheetName: sheetNameInput.trim(),
+                        autoSyncMinutes: autoSyncInput
+                      }));
+                      showSaveSuccess('구글 시트와 연동되어 최신 당직표를 성공적으로 가져왔습니다!');
+                    }}
+                    disabled={isSyncingSheets}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+                    {isSyncingSheets ? '연동 테스트 중...' : '지금 연동 테스트 및 즉시 가져오기'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const nextState = !sheetsConfig.enabled;
+                      setSheetsConfig(prev => ({ ...prev, enabled: nextState }));
+                      showSaveSuccess(nextState ? '구글 시트 자동 동기화가 켜졌습니다.' : '구글 시트 자동 동기화가 꺼졌습니다.');
+                    }}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition ${
+                      sheetsConfig.enabled
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/30 hover:bg-rose-500/30'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {sheetsConfig.enabled ? '연동 끄기' : '연동 켜기'}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 3-Step Setup Guide Card */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
+            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              구글 시트 1분 연동 3단계 안내
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 font-black flex items-center justify-center text-xs">
+                  1
+                </span>
+                <h5 className="font-bold text-white">구글 시트 생성 또는 열기</h5>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  구글 드라이브에서 새 스프레드시트를 만들고, 맨 아래 탭 이름을 <strong>'당직표'</strong>로 지정합니다.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 font-black flex items-center justify-center text-xs">
+                  2
+                </span>
+                <h5 className="font-bold text-white">공유 권한 설정 (핵심!)</h5>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  우측 상단 <strong>[공유]</strong> 버튼 클릭 ➡️ 일반 액세스를 <strong>'링크가 있는 모든 사용자' (역할: 뷰어)</strong>로 변경 후 완료합니다.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 font-black flex items-center justify-center text-xs">
+                  3
+                </span>
+                <h5 className="font-bold text-white">주소 붙여넣고 동기화</h5>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  웹 브라우저 주소창 링크를 복사하여 위의 1번 입력란에 붙여넣고 <strong>[연동 테스트 및 즉시 가져오기]</strong>를 누르면 끝입니다!
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Standard Format Guide Card */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-3">
+            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              구글 시트 권장 열(Column) 구성
+            </h4>
+            <p className="text-xs text-slate-400">
+              구글 시트 1행(헤더)에 아래 순서로 작성하시면 시스템이 자동으로 정확하게 인식합니다:
+            </p>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-800 text-slate-300 font-bold">
+                  <tr>
+                    <th className="p-2.5">A열: 날짜</th>
+                    <th className="p-2.5">B열: 내과1</th>
+                    <th className="p-2.5">C열: 내과2</th>
+                    <th className="p-2.5">D열: 비내과1</th>
+                    <th className="p-2.5">E열: 비내과2</th>
+                    <th className="p-2.5">F열: 비내과3</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
+                  <tr className="hover:bg-slate-800/40">
+                    <td className="p-2.5 text-cyan-300 font-bold">2026-09-01</td>
+                    <td className="p-2.5">이준재</td>
+                    <td className="p-2.5">정소영</td>
+                    <td className="p-2.5">신정민</td>
+                    <td className="p-2.5">이창윤</td>
+                    <td className="p-2.5">배규리</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/40">
+                    <td className="p-2.5 text-cyan-300 font-bold">2026-09-02</td>
+                    <td className="p-2.5">정소영</td>
+                    <td className="p-2.5">박신희</td>
+                    <td className="p-2.5">배규리</td>
+                    <td className="p-2.5">최남석</td>
+                    <td className="p-2.5">이태겸</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       )}
 
