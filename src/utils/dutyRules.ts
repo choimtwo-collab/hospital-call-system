@@ -3,7 +3,7 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  SearchResult, ContactInfo, CustomRule, PathologistSchedule 
+  SearchResult, ContactInfo, CustomRule, PathologistSchedule, DutyPhoneItem 
 } from '../types';
 import { checkKoreanHoliday } from './koreanHolidays';
 
@@ -41,7 +41,8 @@ export function evaluateDutyRules(
   timeSlots: TimeSlot[],
   weeklyCNSchedule: WeeklyCNScheduleMap,
   customRules: CustomRule[] = [],
-  pathologistSchedules: PathologistSchedule[] = []
+  pathologistSchedules: PathologistSchedule[] = [],
+  dutyPhones: DutyPhoneItem[] = []
 ): SearchResult {
   const holidayInfo = checkKoreanHoliday(selectedDate);
   const isWeekendOrHoliday = holidayInfo.isHolidayOrWeekend;
@@ -384,14 +385,25 @@ export function evaluateDutyRules(
       assignedPerson = assignedRole;
     }
 
-    // 내과계 인턴: 개인 UCAP 및 개인폰 우선 매칭!
-    if (assignedRole === ROLES.IM_1 || assignedRole === ROLES.IM_2) {
+    // Look up custom duty phone configured by admin (e.g. '비내과 1', '비내과 2', '비내과 3', '내과 1', etc.)
+    const cleanAssigned = (assignedRole || '').replace(/\s+/g, '');
+    const matchedDutyPhone = cleanAssigned ? dutyPhones.find(dp => {
+      const cleanDp = dp.roleName.replace(/\s+/g, '');
+      return cleanDp === cleanAssigned || cleanAssigned.includes(cleanDp) || cleanDp.includes(cleanAssigned);
+    }) : undefined;
+
+    // 내과계 인턴: 개인 UCAP 및 개인폰 우선 매칭 (단, 공용 당직폰이 등록된 경우 당직폰 우선)
+    if (assignedRole === ROLES.IM_1 || assignedRole === ROLES.IM_2 || assignedRole?.includes('내과')) {
       contactInfo = contacts[assignedPerson] || { phone: '미등록', ucap: '미등록' };
-      // 내과계는 공용 당직폰이 없으므로 개인 UCAP를 기본 번호로 설정
-      dutyUcap = contactInfo.ucap;
-      dutyPhone = contactInfo.phone;
+      dutyUcap = (matchedDutyPhone && matchedDutyPhone.ucap) || contactInfo.ucap;
+      dutyPhone = (matchedDutyPhone && matchedDutyPhone.phone) || contactInfo.phone;
     } 
-    // 비내과계 인턴: 고정된 공용 당직폰 번호 필수 연결!
+    // 비내과계 인턴: 공용 당직폰 번호 우선 연결
+    else if (matchedDutyPhone && (matchedDutyPhone.phone || matchedDutyPhone.ucap)) {
+      dutyPhone = matchedDutyPhone.phone || DUTY_PHONES[assignedRole] || '010-7628-5803';
+      dutyUcap = matchedDutyPhone.ucap || DUTY_UCAPS[assignedRole] || '5-4080';
+      contactInfo = contacts[assignedPerson] || { phone: dutyPhone, ucap: dutyUcap };
+    }
     else if (DUTY_PHONES[assignedRole]) {
       dutyPhone = DUTY_PHONES[assignedRole];
       dutyUcap = DUTY_UCAPS[assignedRole];

@@ -1,6 +1,6 @@
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  EmergencyContact, TaskItem, CustomRule, InternDoctor, PathologistSchedule 
+  EmergencyContact, TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem 
 } from '../types';
 
 export const DEPARTMENTS = ['내과', '비내과'] as const;
@@ -163,24 +163,73 @@ export const initialCustomRules: CustomRule[] = [
   }
 ];
 
-// 인턴 마스터
+// 인턴 마스터 (대구분: 내과/비내과, 중구분: 개인폰/개인 UCAP)
 export const initialInterns: InternDoctor[] = [
-  { id: 'int-1', name: '정소영', dept: 'IM', ucap: '52644', phone: '010-3948-1029' },
-  { id: 'int-2', name: '전지연', dept: 'IM', ucap: '52642', phone: '010-4829-1920' },
-  { id: 'int-3', name: '이준재', dept: 'IM', ucap: '52606', phone: '010-5829-4019' },
-  { id: 'int-4', name: '박신희', dept: 'GS', ucap: '52634', phone: '010-9182-3847' },
-  { id: 'int-5', name: '박수현', dept: 'OBGY', ucap: '52633', phone: '010-2938-4710' },
-  { id: 'int-6', name: '신정민', dept: 'OS', ucap: '52637', phone: '010-5928-1039' },
-  { id: 'int-7', name: '신유경', dept: 'PED', ucap: '52636', phone: '010-7281-9402' },
-  { id: 'int-8', name: '권민재', dept: 'NS', ucap: '52632', phone: '010-1829-3049' },
-  { id: 'int-9', name: '이태겸', dept: 'UR', ucap: '52641', phone: '010-9201-4829' },
-  { id: 'int-10', name: '배규리', dept: 'ENT', ucap: '52635', phone: '010-8273-1940' },
-  { id: 'int-11', name: '이상엽', dept: 'EYE', ucap: '52605', phone: '010-3819-2049' },
-  { id: 'int-12', name: '이창윤', dept: 'DERM', ucap: '52607', phone: '010-4729-1029' },
-  { id: 'int-13', name: '천지원', dept: 'PSY', ucap: '52608', phone: '010-1928-3049' },
-  { id: 'int-14', name: '최남석', dept: 'NR', ucap: '52609', phone: '010-5829-1029' },
-  { id: 'int-15', name: '전하윤', dept: 'RM', ucap: '52643', phone: '010-2938-1029' },
-  { id: 'int-16', name: '유성윤', dept: 'CS', ucap: '52604', phone: '010-9281-0492' },
+  // 내과계 전공의
+  { id: 'int-im-1', name: '이준재', dept: 'IM', category: '내과', ucap: '52606', phone: '010-5829-4019' },
+  { id: 'int-im-2', name: '박신희', dept: 'IM', category: '내과', ucap: '52634', phone: '010-9182-3847' },
+  { id: 'int-im-3', name: '전지연', dept: 'IM', category: '내과', ucap: '52642', phone: '010-4829-1920' },
+  { id: 'int-im-4', name: '정소영', dept: 'IM', category: '내과', ucap: '52644', phone: '010-3948-1029' },
+  { id: 'int-im-5', name: '박수현', dept: 'IM(분)', category: '내과', ucap: '52633', phone: '010-2938-4710' },
+  { id: 'int-im-6', name: '신정민', dept: 'IM(분)', category: '내과', ucap: '52637', phone: '010-5928-1039' },
+  { id: 'int-im-7', name: '유성윤', dept: 'PED/NP', category: '내과', ucap: '52604', phone: '010-9281-0492' },
+  { id: 'int-im-8', name: '전하윤', dept: 'NP/PED', category: '내과', ucap: '52643', phone: '010-2938-1029' },
+
+  // 비내과계 전공의
+  { id: 'int-non-1', name: '이상엽', dept: 'OBGY', category: '비내과', ucap: '52605', phone: '010-3819-2049' },
+  { id: 'int-non-2', name: '신유경', dept: 'OBGY', category: '비내과', ucap: '52636', phone: '010-7281-9402' },
+  { id: 'int-non-3', name: '이창윤', dept: 'GS', category: '비내과', ucap: '52607', phone: '010-4729-1029' },
+  { id: 'int-non-4', name: '이태겸', dept: 'GS', category: '비내과', ucap: '52641', phone: '010-9201-4829' },
+  { id: 'int-non-5', name: '천지원', dept: 'OT', category: '비내과', ucap: '52608', phone: '010-1928-3049' },
+  { id: 'int-non-6', name: '최남석', dept: 'RM', category: '비내과', ucap: '52609', phone: '010-5829-1029' },
+  { id: 'int-non-7', name: '권민재', dept: 'CS', category: '비내과', ucap: '52632', phone: '010-1829-3049' },
+  { id: 'int-non-8', name: '배규리', dept: 'AN', category: '비내과', ucap: '52635', phone: '010-8273-1940' }
+];
+
+// 당직폰 마스터 (대구분: 내과/비내과, 중구분: 당직폰 UCAP / 당직 핸드폰번호)
+export const initialDutyPhones: DutyPhoneItem[] = [
+  // 내과계 당직폰
+  {
+    id: 'dp-im-1',
+    deptCategory: '내과',
+    roleName: '내과 1',
+    phone: '',
+    ucap: '',
+    notes: '개인폰(UCAP) 기본 사용'
+  },
+  {
+    id: 'dp-im-2',
+    deptCategory: '내과',
+    roleName: '내과 2',
+    phone: '',
+    ucap: '',
+    notes: '개인폰(UCAP) 기본 사용'
+  },
+  // 비내과계 당직폰
+  {
+    id: 'dp-non-1',
+    deptCategory: '비내과',
+    roleName: '비내과 1',
+    phone: '010-7628-5803',
+    ucap: '5-4080',
+    notes: '정규 당직폰'
+  },
+  {
+    id: 'dp-non-2',
+    deptCategory: '비내과',
+    roleName: '비내과 2',
+    phone: '010-7624-5803',
+    ucap: '5-4081',
+    notes: '정규 당직폰'
+  },
+  {
+    id: 'dp-non-3',
+    deptCategory: '비내과',
+    roleName: '비내과 3',
+    phone: '010-5794-4170',
+    ucap: '5-3499',
+    notes: '(임시)'
+  }
 ];
 
 export const initialContacts: ContactMap = {

@@ -6,11 +6,11 @@ import {
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
-  initialDutyRoles
+  initialDutyRoles, initialDutyPhones
 } from './data/initialData';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem 
 } from './types';
 import { 
   GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
@@ -27,7 +27,8 @@ const STORAGE_KEYS = {
   INTERNS: 'hcs_interns_v1',
   PATHOLOGISTS: 'hcs_pathologists_v1',
   SHEETS_CONFIG: 'hcs_sheets_config_v1',
-  DUTY_ROLES: 'hcs_duty_roles_v1'
+  DUTY_ROLES: 'hcs_duty_roles_v1',
+  DUTY_PHONES: 'hcs_duty_phones_v1'
 };
 
 export default function App() {
@@ -89,6 +90,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialDutyRoles;
   });
 
+  const [dutyPhones, setDutyPhones] = useState<DutyPhoneItem[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DUTY_PHONES);
+    return saved ? JSON.parse(saved) : initialDutyPhones;
+  });
+
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
@@ -100,6 +106,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.DUTY_ROLES, JSON.stringify(dutyRoles));
   }, [dutyRoles]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DUTY_PHONES, JSON.stringify(dutyPhones));
+  }, [dutyPhones]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
@@ -195,6 +205,7 @@ export default function App() {
     setPathologistSchedules(initialPathologistSchedules);
     setSheetsConfig(DEFAULT_SHEETS_CONFIG);
     setDutyRoles(initialDutyRoles);
+    setDutyPhones(initialDutyPhones);
   };
 
   return (
@@ -223,6 +234,7 @@ export default function App() {
             tasks={tasks}
             customRules={customRules}
             pathologistSchedules={pathologistSchedules}
+            dutyPhones={dutyPhones}
             sheetsConfig={sheetsConfig}
             onSyncSheets={() => handleSyncSheets()}
             isSyncingSheets={isSyncingSheets}
@@ -251,6 +263,8 @@ export default function App() {
             setSheetsConfig={setSheetsConfig}
             dutyRoles={dutyRoles}
             setDutyRoles={setDutyRoles}
+            dutyPhones={dutyPhones}
+            setDutyPhones={setDutyPhones}
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}

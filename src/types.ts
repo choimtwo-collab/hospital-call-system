@@ -89,10 +89,20 @@ export interface CustomRule {
   action: RuleAction;
 }
 
+export interface DutyPhoneItem {
+  id: string;
+  deptCategory: '내과' | '비내과';
+  roleName: string; // '내과 1', '내과 2', '비내과 1', '비내과 2', '비내과 3' 등
+  phone: string;
+  ucap: string;
+  notes?: string;
+}
+
 export interface InternDoctor {
   id: string;
   name: string;
   dept: string;
+  category: '내과' | '비내과';
   ucap: string;
   phone: string;
 }

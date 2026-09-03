@@ -10,7 +10,7 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  SearchResult, TaskItem, CustomRule, PathologistSchedule 
+  SearchResult, TaskItem, CustomRule, PathologistSchedule, DutyPhoneItem 
 } from '../types';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
@@ -25,6 +25,7 @@ interface UserViewProps {
   tasks: TaskItem[];
   customRules: CustomRule[];
   pathologistSchedules: PathologistSchedule[];
+  dutyPhones?: DutyPhoneItem[];
   sheetsConfig: GoogleSheetsConfig;
   onSyncSheets: () => void;
   isSyncingSheets: boolean;
@@ -41,6 +42,7 @@ export const UserView: React.FC<UserViewProps> = ({
   tasks,
   customRules,
   pathologistSchedules,
+  dutyPhones = [],
   sheetsConfig,
   onSyncSheets,
   isSyncingSheets
@@ -95,10 +97,11 @@ export const UserView: React.FC<UserViewProps> = ({
       timeSlots,
       weeklyCNSchedule,
       customRules,
-      pathologistSchedules
+      pathologistSchedules,
+      dutyPhones
     );
     setSearchResult(result);
-  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules]);
+  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules, dutyPhones]);
 
   const setToCurrentTime = () => {
     const iso = getLocalISOString();

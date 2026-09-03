@@ -10,7 +10,7 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory, DutyPhoneItem 
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
@@ -40,6 +40,8 @@ interface AdminViewProps {
   setSheetsConfig: React.Dispatch<React.SetStateAction<GoogleSheetsConfig>>;
   dutyRoles: string[];
   setDutyRoles: React.Dispatch<React.SetStateAction<string[]>>;
+  dutyPhones: DutyPhoneItem[];
+  setDutyPhones: React.Dispatch<React.SetStateAction<DutyPhoneItem[]>>;
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
@@ -57,11 +59,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
   pathologistSchedules, setPathologistSchedules,
   sheetsConfig, setSheetsConfig,
   dutyRoles, setDutyRoles,
+  dutyPhones, setDutyPhones,
   onSyncSheets, isSyncingSheets,
   onResetData
 }) => {
   const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
   const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [dutyPhoneDeptFilter, setDutyPhoneDeptFilter] = useState<'ALL' | '내과' | '비내과'>('ALL');
   const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('timeslot');
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number>(1); // 1 = Monday
   const [newDateInput, setNewDateInput] = useState<string>('');
@@ -222,6 +226,80 @@ export const AdminView: React.FC<AdminViewProps> = ({
       return next;
     });
     showSaveSuccess(`구분명이 '${newName}'(으)로 변경되었습니다.`);
+  };
+
+  // --- Duty Phone (공용 당직폰) Handlers ---
+  const handleAddDutyPhone = (deptCategory: '내과' | '비내과') => {
+    const existingInDept = dutyPhones.filter(dp => dp.deptCategory === deptCategory);
+    const nextNum = existingInDept.length + 1;
+    const defaultRoleName = `${deptCategory} ${nextNum}`;
+    const newPhone: DutyPhoneItem = {
+      id: `dp-${deptCategory === '내과' ? 'im' : 'non'}-${Date.now()}`,
+      deptCategory,
+      roleName: defaultRoleName,
+      phone: '',
+      ucap: '',
+      notes: deptCategory === '내과' ? '개인폰(UCAP) 기본 사용' : '당직폰'
+    };
+    setDutyPhones(prev => [...prev, newPhone]);
+    showSaveSuccess(`새 ${deptCategory} 당직폰(${defaultRoleName})이 추가되었습니다.`);
+  };
+
+  const handleDeleteDutyPhone = (id: string, roleName: string) => {
+    if (confirm(`'${roleName}' 당직폰 설정을 삭제하시겠습니까?`)) {
+      setDutyPhones(prev => prev.filter(dp => dp.id !== id));
+      showSaveSuccess(`'${roleName}' 당직폰이 삭제되었습니다.`);
+    }
+  };
+
+  const handleUpdateDutyPhone = (id: string, field: keyof DutyPhoneItem, value: string) => {
+    setDutyPhones(prev => prev.map(dp => dp.id === id ? { ...dp, [field]: value } : dp));
+  };
+
+  // --- Intern (전공의 개인폰/개인 UCAP) Handlers ---
+  const handleAddIntern = (category: '내과' | '비내과') => {
+    const newIntern: InternDoctor = {
+      id: `int-${category === '내과' ? 'im' : 'non'}-${Date.now()}`,
+      name: '',
+      dept: category === '내과' ? 'IM' : 'GS',
+      category,
+      ucap: '',
+      phone: ''
+    };
+    setInterns(prev => [...prev, newIntern]);
+    showSaveSuccess(`새 ${category} 전공의 항목이 추가되었습니다.`);
+  };
+
+  const handleDeleteIntern = (id: string, name: string) => {
+    if (confirm(`'${name || '전공의'}' 항목을 삭제하시겠습니까?`)) {
+      setInterns(prev => prev.filter(item => item.id !== id));
+      if (name) {
+        setContacts(prev => {
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        });
+      }
+      showSaveSuccess('전공의 항목이 삭제되었습니다.');
+    }
+  };
+
+  const handleUpdateIntern = (id: string, field: keyof InternDoctor, value: string) => {
+    setInterns(prev => {
+      const updated = prev.map(item => item.id === id ? { ...item, [field]: value } : item);
+      const changedDoctor = updated.find(item => item.id === id);
+      if (changedDoctor && changedDoctor.name) {
+        setContacts(cPrev => ({
+          ...cPrev,
+          [changedDoctor.name]: {
+            phone: changedDoctor.phone,
+            ucap: changedDoctor.ucap,
+            dumcTalk: `${changedDoctor.name}(인턴)`
+          }
+        }));
+      }
+      return updated;
+    });
   };
 
   // --- Task Master Handlers ---
@@ -1543,58 +1621,428 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
           </div>
 
-          {/* Intern Master Contacts */}
-          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Phone className="w-5 h-5 text-cyan-400" />
-              인턴 마스터 & 개인 UCAP 연락처 매핑
-            </h3>
-            <p className="text-xs text-slate-400">
-              내과계 인턴은 개인 UCAP 번호로 직접 다이얼되므로, 각 인턴의 개인 UCAP 번호가 정확해야 합니다.
-            </p>
+          {/* ===================================================================== */}
+          {/* SECTION: 의료진 당직폰 & 전공의 연락처 통합 매핑                         */}
+          {/* (대구분: 내과/비내과 ➡️ 중구분: 당직폰/개인폰)                            */}
+          {/* ===================================================================== */}
+          <div className="space-y-6">
+            
+            {/* Department Sub-Tabs Header */}
+            <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-cyan-400" />
+                  의료진 당직폰 & 전공의 개인 연락처 통합 관리
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  대구분(내과계 / 비내과계) ➡️ 중구분(공용 당직폰 / 전공의 개인폰) 체계로 번호 및 UCAP을 관리합니다.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {Object.keys(contacts).filter(name => !name.includes('당직') && !name.includes('임상병리사') && !name.includes('해당과')).map(name => (
-                <div key={name} className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-white text-xs">{name} (인턴)</span>
-                    <span className="text-[10px] text-cyan-400 font-bold">UCAP: {contacts[name]?.ucap}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">개인 UCAP</label>
-                      <input
-                        type="text"
-                        value={contacts[name]?.ucap || ''}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setContacts(prev => ({
-                            ...prev,
-                            [name]: { ...prev[name], ucap: val }
-                          }));
-                        }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">휴대전화</label>
-                      <input
-                        type="text"
-                        value={contacts[name]?.phone || ''}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setContacts(prev => ({
-                            ...prev,
-                            [name]: { ...prev[name], phone: val }
-                          }));
-                        }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
-                      />
-                    </div>
+              <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+                <button
+                  onClick={() => setDutyPhoneDeptFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    dutyPhoneDeptFilter === 'ALL' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  전체 보기
+                </button>
+                <button
+                  onClick={() => setDutyPhoneDeptFilter('내과')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    dutyPhoneDeptFilter === '내과' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🔵 내과계
+                </button>
+                <button
+                  onClick={() => setDutyPhoneDeptFilter('비내과')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    dutyPhoneDeptFilter === '비내과' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🟢 비내과계
+                </button>
+              </div>
+            </div>
+
+            {/* 1. 내과계 섹션 */}
+            {(dutyPhoneDeptFilter === 'ALL' || dutyPhoneDeptFilter === '내과') && (
+              <div className="glass-panel p-6 rounded-3xl border border-blue-500/30 bg-gradient-to-b from-blue-950/20 via-slate-900/60 to-slate-900/90 shadow-2xl space-y-6">
+                <div className="flex items-center justify-between border-b border-blue-500/20 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-blue-400"></span>
+                    <h4 className="text-base font-black text-white">
+                      내과계 (Internal Medicine) 연락망
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[11px] font-bold border border-blue-500/30">
+                      대구분: 내과
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* 1-A. 내과계 당직폰 설정 */}
+                <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-sm font-bold text-blue-300 flex items-center gap-1.5">
+                        📱 내과계 당직폰 (공용 UCAP / 핸드폰)
+                      </h5>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        * 내과계는 기본적으로 전공의 개인폰(UCAP)으로 연결됩니다. 공용 당직폰 번호를 입력하면 해당 번호로 우선 연결됩니다.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleAddDutyPhone('내과')}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 transition shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      내과 당직폰 추가
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-900 text-slate-300 font-bold uppercase">
+                        <tr>
+                          <th className="p-2.5 w-32">구분 (역할명)</th>
+                          <th className="p-2.5 w-36">당직 UCAP</th>
+                          <th className="p-2.5 w-44">당직 핸드폰번호</th>
+                          <th className="p-2.5">비고 / 메모</th>
+                          <th className="p-2.5 w-14 text-center">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-medium">
+                        {dutyPhones.filter(dp => dp.deptCategory === '내과').map(dp => (
+                          <tr key={dp.id} className="hover:bg-slate-900/40 transition">
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.roleName}
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'roleName', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-blue-300 font-bold focus:outline-none focus:border-blue-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.ucap}
+                                placeholder="예: 5-4080"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'ucap', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.phone}
+                                placeholder="예: 010-0000-0000"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'phone', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.notes || ''}
+                                placeholder="메모 (예: 개인폰(UCAP) 기본 사용)"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'notes', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-400"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                onClick={() => handleDeleteDutyPhone(dp.id, dp.roleName)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 1-B. 내과계 전공의 개인폰/개인 UCAP 설정 */}
+                <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-sm font-bold text-cyan-300 flex items-center gap-1.5">
+                        👤 내과계 전공의 개인 연락처 (개인 UCAP / 개인 핸드폰)
+                      </h5>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        * 진료과(IM, IM(분), PED/NP, NP/PED 등), 성명, 개인 UCAP, 개인 휴대전화를 관리합니다.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleAddIntern('내과')}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      내과계 의사 추가
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-900 text-slate-300 font-bold uppercase">
+                        <tr>
+                          <th className="p-2.5 w-28">진료과</th>
+                          <th className="p-2.5 w-32">성명</th>
+                          <th className="p-2.5 w-36">개인 UCAP</th>
+                          <th className="p-2.5 w-44">개인 휴대전화</th>
+                          <th className="p-2.5 w-14 text-center">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-medium">
+                        {interns.filter(it => it.category === '내과').map(it => (
+                          <tr key={it.id} className="hover:bg-slate-900/40 transition">
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.dept}
+                                placeholder="예: IM"
+                                onChange={e => handleUpdateIntern(it.id, 'dept', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-cyan-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.name}
+                                placeholder="이름"
+                                onChange={e => handleUpdateIntern(it.id, 'name', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-bold focus:outline-none focus:border-cyan-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.ucap}
+                                placeholder="예: 52606"
+                                onChange={e => handleUpdateIntern(it.id, 'ucap', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.phone}
+                                placeholder="예: 010-0000-0000"
+                                onChange={e => handleUpdateIntern(it.id, 'phone', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-cyan-400"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                onClick={() => handleDeleteIntern(it.id, it.name)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. 비내과계 섹션 */}
+            {(dutyPhoneDeptFilter === 'ALL' || dutyPhoneDeptFilter === '비내과') && (
+              <div className="glass-panel p-6 rounded-3xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/20 via-slate-900/60 to-slate-900/90 shadow-2xl space-y-6">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-emerald-400"></span>
+                    <h4 className="text-base font-black text-white">
+                      비내과계 (Non-Internal Medicine) 연락망
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
+                      대구분: 비내과
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2-A. 비내과계 당직폰 설정 */}
+                <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                        📱 비내과계 당직폰 (공용 UCAP / 핸드폰)
+                      </h5>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        * 비내과계 필수 콜 접수용 공용 당직폰 번호 및 원내 UCAP입니다. (비내과 1: 5-4080, 비내과 2: 5-4081, 비내과 3: 5-3499(임시))
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleAddDutyPhone('비내과')}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      비내과 당직폰 추가
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-900 text-slate-300 font-bold uppercase">
+                        <tr>
+                          <th className="p-2.5 w-32">구분 (역할명)</th>
+                          <th className="p-2.5 w-36">당직 UCAP</th>
+                          <th className="p-2.5 w-44">당직 핸드폰번호</th>
+                          <th className="p-2.5">비고 / 메모</th>
+                          <th className="p-2.5 w-14 text-center">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-medium">
+                        {dutyPhones.filter(dp => dp.deptCategory === '비내과').map(dp => (
+                          <tr key={dp.id} className="hover:bg-slate-900/40 transition">
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.roleName}
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'roleName', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-emerald-300 font-bold focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.ucap}
+                                placeholder="예: 5-4080"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'ucap', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.phone}
+                                placeholder="예: 010-7628-5803"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'phone', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={dp.notes || ''}
+                                placeholder="메모 (예: 정규 당직폰, (임시) 등)"
+                                onChange={e => handleUpdateDutyPhone(dp.id, 'notes', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                onClick={() => handleDeleteDutyPhone(dp.id, dp.roleName)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2-B. 비내과계 전공의 개인폰/개인 UCAP 설정 */}
+                <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                        👤 비내과계 전공의 개인 연락처 (개인 UCAP / 개인 핸드폰)
+                      </h5>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        * 진료과(OBGY, GS, OT, RM, CS, AN 등), 성명, 개인 UCAP, 개인 휴대전화를 관리합니다.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleAddIntern('비내과')}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      비내과계 의사 추가
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-900 text-slate-300 font-bold uppercase">
+                        <tr>
+                          <th className="p-2.5 w-28">진료과</th>
+                          <th className="p-2.5 w-32">성명</th>
+                          <th className="p-2.5 w-36">개인 UCAP</th>
+                          <th className="p-2.5 w-44">개인 휴대전화</th>
+                          <th className="p-2.5 w-14 text-center">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-medium">
+                        {interns.filter(it => it.category === '비내과').map(it => (
+                          <tr key={it.id} className="hover:bg-slate-900/40 transition">
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.dept}
+                                placeholder="예: GS"
+                                onChange={e => handleUpdateIntern(it.id, 'dept', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.name}
+                                placeholder="이름"
+                                onChange={e => handleUpdateIntern(it.id, 'name', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-bold focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.ucap}
+                                placeholder="예: 52605"
+                                onChange={e => handleUpdateIntern(it.id, 'ucap', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                value={it.phone}
+                                placeholder="예: 010-0000-0000"
+                                onChange={e => handleUpdateIntern(it.id, 'phone', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                onClick={() => handleDeleteIntern(it.id, it.name)}
+                                className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}
