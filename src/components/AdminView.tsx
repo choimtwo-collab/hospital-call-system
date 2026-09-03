@@ -80,6 +80,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
+  // 공통전담 스케쥴 일괄 배정 도구 상태
+  const [batchTargetGroup, setBatchTargetGroup] = useState<string>('ALL');
+  const [batchTargetSlot, setBatchTargetSlot] = useState<string>('ALL');
+  const [batchTargetDays, setBatchTargetDays] = useState<number[]>([1, 2, 3, 4, 5]); // 기본 평일(월~금)
+  const [batchSelectedRole, setBatchSelectedRole] = useState<string>('공통전담 1');
+  const [showBatchPanel, setShowBatchPanel] = useState<boolean>(true);
+
   // 구글 시트 연동 폼 상태
   const [sheetUrlInput, setSheetUrlInput] = useState<string>(sheetsConfig.sheetUrl);
   const [sheetNameInput, setSheetNameInput] = useState<string>(sheetsConfig.sheetName || '당직표');
@@ -358,20 +365,64 @@ export const AdminView: React.FC<AdminViewProps> = ({
       if (group.id !== groupId) return group;
       const currentSlot = group.schedule[timeSlotId] || {};
       const currentCell = currentSlot[dayOfWeek] || { role: '', ucap: '' };
+      
+      const updatedCell = {
+        ...currentCell,
+        [field]: value
+      };
+
+      if (field === 'role') {
+        const contact = getCNPostContact(value, cnPosts);
+        updatedCell.ucap = contact.ucap;
+        updatedCell.phone = contact.phone;
+      }
+
       return {
         ...group,
         schedule: {
           ...group.schedule,
           [timeSlotId]: {
             ...currentSlot,
-            [dayOfWeek]: {
-              ...currentCell,
-              [field]: value
-            }
+            [dayOfWeek]: updatedCell
           }
         }
       };
     }));
+  };
+
+  const handleBatchFill = (
+    targetGroupIds: string[],
+    targetSlotIds: string[],
+    targetDays: number[],
+    roleName: string
+  ) => {
+    if (!setCnGroupSchedules) return;
+    const finalRole = roleName === 'CLEAR' ? '' : roleName;
+    const contact = getCNPostContact(finalRole, cnPosts);
+
+    setCnGroupSchedules(prev => prev.map(grp => {
+      if (targetGroupIds.length > 0 && !targetGroupIds.includes(grp.id)) return grp;
+
+      const newSchedule = { ...grp.schedule };
+      targetSlotIds.forEach(slotId => {
+        const slotCells = { ...(newSchedule[slotId] || {}) };
+        targetDays.forEach(day => {
+          slotCells[day] = {
+            role: finalRole,
+            ucap: contact.ucap,
+            phone: contact.phone
+          };
+        });
+        newSchedule[slotId] = slotCells;
+      });
+
+      return {
+        ...grp,
+        schedule: newSchedule
+      };
+    }));
+
+    showSaveSuccess(`${finalRole ? finalRole + '이(가)' : '근무자가'} 일괄 배정되었습니다.`);
   };
 
   const handleUpdateCNGroupTitle = (groupId: string, newTitle: string) => {
@@ -2432,7 +2483,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <datalist id="cn-posts-datalist">
                 {cnPosts.map(p => (
                   <option key={p.id} value={p.name}>
-                    {p.name} (UCAP: {p.ucap})
+                    {p.name}
                   </option>
                 ))}
               </datalist>
@@ -2460,6 +2511,170 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </div>
               </div>
 
+              {/* Master Batch Assignment Panel */}
+              <div className="glass-panel p-4 sm:p-5 rounded-3xl border border-cyan-500/40 bg-slate-900/90 shadow-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 font-black text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      ⚡ 공통전담 일괄 배정 도구
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      원하는 병동 그룹, 시간대, 요일 범위를 지정하여 공통전담을 한 번에 배정합니다.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowBatchPanel(!showBatchPanel)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                  >
+                    {showBatchPanel ? '접기 ▲' : '도구 열기 ▼'}
+                  </button>
+                </div>
+
+                {showBatchPanel && (
+                  <div className="pt-2 border-t border-slate-800 flex flex-wrap items-end gap-3 text-xs">
+                    {/* 1. 대상 병동 그룹 */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 block">1. 대상 병동 그룹</label>
+                      <select
+                        value={batchTargetGroup}
+                        onChange={e => setBatchTargetGroup(e.target.value)}
+                        className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 font-bold text-slate-200 focus:outline-none focus:border-cyan-400"
+                      >
+                        <option value="ALL">🌟 전체 병동 그룹 (모두)</option>
+                        {cnGroupSchedules?.map(g => (
+                          <option key={g.id} value={g.id}>{g.title}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 2. 대상 시간대 */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 block">2. 대상 시간대</label>
+                      <select
+                        value={batchTargetSlot}
+                        onChange={e => setBatchTargetSlot(e.target.value)}
+                        className="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 font-bold text-amber-300 focus:outline-none focus:border-cyan-400"
+                      >
+                        <option value="ALL">⏰ 전체 시간대 (3교대 모두)</option>
+                        {timeSlots.map(ts => (
+                          <option key={ts.id} value={ts.id}>{ts.name} ({ts.start}~{ts.end})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. 대상 요일 */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[11px] font-bold text-slate-400">3. 대상 요일</label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setBatchTargetDays([1, 2, 3, 4, 5])}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              JSON.stringify([...batchTargetDays].sort()) === JSON.stringify([1, 2, 3, 4, 5])
+                                ? 'bg-cyan-500 text-slate-950'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            평일(월~금)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBatchTargetDays([6, 0])}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              JSON.stringify([...batchTargetDays].sort()) === JSON.stringify([0, 6])
+                                ? 'bg-cyan-500 text-slate-950'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            주말(토~일)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBatchTargetDays([1, 2, 3, 4, 5, 6, 0])}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              batchTargetDays.length === 7
+                                ? 'bg-cyan-500 text-slate-950'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            전체(7일)
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        {[
+                          { day: 1, name: '월' },
+                          { day: 2, name: '화' },
+                          { day: 3, name: '수' },
+                          { day: 4, name: '목' },
+                          { day: 5, name: '금' },
+                          { day: 6, name: '토' },
+                          { day: 0, name: '일' }
+                        ].map(d => {
+                          const isChecked = batchTargetDays.includes(d.day);
+                          return (
+                            <button
+                              key={d.day}
+                              type="button"
+                              onClick={() => {
+                                setBatchTargetDays(prev => 
+                                  prev.includes(d.day) ? prev.filter(x => x !== d.day) : [...prev, d.day]
+                                );
+                              }}
+                              className={`w-6 h-6 rounded-lg text-xs font-bold transition ${
+                                isChecked
+                                  ? 'bg-cyan-500 text-slate-950 font-black'
+                                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900'
+                              }`}
+                            >
+                              {d.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 4. 배정할 공통전담 */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 block">4. 배정할 공통전담</label>
+                      <select
+                        value={batchSelectedRole}
+                        onChange={e => setBatchSelectedRole(e.target.value)}
+                        className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 font-black text-cyan-300 focus:outline-none focus:border-cyan-400"
+                      >
+                        {Array.from({ length: 10 }, (_, i) => (
+                          <option key={i + 1} value={`공통전담 ${i + 1}`}>
+                            공통전담 {i + 1}
+                          </option>
+                        ))}
+                        <option value="CLEAR">-- 미배정 (비우기) --</option>
+                      </select>
+                    </div>
+
+                    {/* 5. 실행 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetGroups = batchTargetGroup === 'ALL' ? (cnGroupSchedules?.map(g => g.id) || []) : [batchTargetGroup];
+                        const targetSlots = batchTargetSlot === 'ALL' ? timeSlots.map(ts => ts.id) : [batchTargetSlot];
+                        if (batchTargetDays.length === 0) {
+                          alert('최소 1개 이상의 요일을 선택해주세요.');
+                          return;
+                        }
+                        handleBatchFill(targetGroups, targetSlots, batchTargetDays, batchSelectedRole);
+                      }}
+                      className="px-5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/25 flex items-center gap-1.5 transition active:scale-95"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      ⚡ 일괄 배정 실행
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Info Notice Box */}
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-cyan-950/40 border border-cyan-800/40 text-xs">
                 <span className="text-slate-300">
@@ -2478,13 +2693,42 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <tr>
                       <th className="p-3.5 w-52 border-r border-slate-700 text-sm">병동 그룹</th>
                       <th className="p-3.5 w-36 border-r border-slate-700 text-sm text-amber-300">시간대</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">월요일</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">화요일</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">수요일</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">목요일</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px]">금요일</th>
-                      <th className="p-3.5 border-r border-slate-700 min-w-[125px] text-cyan-300">토요일</th>
-                      <th className="p-3.5 min-w-[125px] text-rose-300">일요일</th>
+                      {[
+                        { day: 1, name: '월' },
+                        { day: 2, name: '화' },
+                        { day: 3, name: '수' },
+                        { day: 4, name: '목' },
+                        { day: 5, name: '금' },
+                        { day: 6, name: '토' },
+                        { day: 0, name: '일' }
+                      ].map(d => (
+                        <th 
+                          key={d.day} 
+                          className={`p-2.5 border-r border-slate-700 min-w-[125px] ${
+                            d.name === '토' ? 'text-cyan-300' : (d.name === '일' ? 'text-rose-300' : '')
+                          }`}
+                        >
+                          <div>{d.name}요일</div>
+                          <select
+                            onChange={e => {
+                              if (e.target.value) {
+                                const allGroupIds = cnGroupSchedules?.map(g => g.id) || [];
+                                const allSlotIds = timeSlots.map(t => t.id);
+                                handleBatchFill(allGroupIds, allSlotIds, [d.day], e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                            className="mt-1 text-[9px] font-bold bg-slate-950 text-slate-400 hover:text-white px-1 py-0.5 rounded border border-slate-800 cursor-pointer"
+                            title={`${d.name}요일 전체 일괄 배정`}
+                          >
+                            <option value="">일괄 ▾</option>
+                            {Array.from({ length: 10 }, (_, i) => (
+                              <option key={i + 1} value={`공통전담 ${i + 1}`}>공통전담 {i + 1}</option>
+                            ))}
+                            <option value="CLEAR">비우기</option>
+                          </select>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 
@@ -2560,18 +2804,55 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             )}
 
                             {/* Column 2: 시간대 (06:30~14:30 / 14:30~22:00 / 22:00~06:30) */}
-                            <td className="p-3 font-mono font-bold text-xs bg-amber-950/20 text-amber-300 border-r border-slate-700 whitespace-nowrap text-center">
+                            <td className="p-2.5 font-mono font-bold text-xs bg-amber-950/20 text-amber-300 border-r border-slate-700 whitespace-nowrap text-center space-y-1.5">
                               <div>{ts.start}~{ts.end}</div>
-                              <span className="text-[10px] text-amber-400/60 font-sans block mt-0.5">
+                              <span className="text-[10px] text-amber-400/60 font-sans block">
                                 {ts.name.split(' ')[0]}
                               </span>
+
+                              {/* Quick inline row batch fills */}
+                              <div className="pt-1.5 border-t border-slate-800/80 flex flex-col gap-1 items-center">
+                                <select
+                                  onChange={e => {
+                                    if (e.target.value) {
+                                      handleBatchFill([grp.id], [ts.id], [1, 2, 3, 4, 5], e.target.value);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  className="text-[10px] bg-slate-900 text-cyan-300 font-bold px-1.5 py-0.5 rounded border border-cyan-800/60 cursor-pointer"
+                                  title="이 시간대 평일(월~금) 일괄 배정"
+                                >
+                                  <option value="">평일(월~금) ▾</option>
+                                  {Array.from({ length: 10 }, (_, i) => (
+                                    <option key={i + 1} value={`공통전담 ${i + 1}`}>공통전담 {i + 1}</option>
+                                  ))}
+                                  <option value="CLEAR">비우기</option>
+                                </select>
+
+                                <select
+                                  onChange={e => {
+                                    if (e.target.value) {
+                                      handleBatchFill([grp.id], [ts.id], [6, 0], e.target.value);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  className="text-[10px] bg-slate-900 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-800/60 cursor-pointer"
+                                  title="이 시간대 주말(토~일) 일괄 배정"
+                                >
+                                  <option value="">주말(토~일) ▾</option>
+                                  {Array.from({ length: 10 }, (_, i) => (
+                                    <option key={i + 1} value={`공통전담 ${i + 1}`}>공통전담 {i + 1}</option>
+                                  ))}
+                                  <option value="CLEAR">비우기</option>
+                                </select>
+                              </div>
                             </td>
 
                             {/* Columns 3~9: 월, 화, 수, 목, 금, 토, 일 */}
                             {IMAGE1_DAYS.map(d => {
                               const cell = grp.schedule?.[ts.id]?.[d.day] || { role: '', ucap: '' };
                               const contact = getCNPostContact(cell.role, cnPosts);
-                              const displayUcap = cell.ucap || contact.ucap;
+                              const displayUcap = contact.ucap || cell.ucap;
 
                               return (
                                 <td 
@@ -2579,7 +2860,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                   className="p-2 border-r border-slate-800/80 align-middle hover:bg-slate-900/60 transition group"
                                 >
                                   <div className="space-y-1">
-                                    {/* Role Select Dropdown (1~10) */}
+                                    {/* Role Select Dropdown (1~10) - labels without contact */}
                                     <select
                                       value={(() => {
                                         if (!cell.role) return '';
@@ -2596,16 +2877,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                       <option value="" className="bg-slate-950 text-slate-400">-- 미배정 --</option>
                                       {Array.from({ length: 10 }, (_, i) => {
                                         const roleName = `공통전담 ${i + 1}`;
-                                        const pContact = getCNPostContact(roleName, cnPosts);
                                         return (
                                           <option key={i + 1} value={roleName} className="bg-slate-900 text-white font-medium">
-                                            {roleName} {pContact.ucap ? `(☎ ${pContact.ucap})` : ''}
+                                            {roleName}
                                           </option>
                                         );
                                       })}
                                     </select>
 
-                                    {/* Auto-resolved 공용 UCAP Display */}
+                                    {/* Auto-resolved 공용 UCAP Display from cnPosts */}
                                     {displayUcap ? (
                                       <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-black text-cyan-300 bg-cyan-950/90 px-2 py-0.5 rounded-md border border-cyan-800/60 shadow-sm">
                                         <span>📞 {displayUcap}</span>
