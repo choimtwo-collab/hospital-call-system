@@ -2579,51 +2579,54 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                   className="p-2 border-r border-slate-800/80 align-middle hover:bg-slate-900/60 transition group"
                                 >
                                   <div className="space-y-1">
-                                    {/* Role Input with Datalist */}
-                                    <input
-                                      list="cn-posts-datalist"
-                                      type="text"
-                                      value={cell.role || ''}
+                                    {/* Role Select Dropdown (1~10) */}
+                                    <select
+                                      value={(() => {
+                                        if (!cell.role) return '';
+                                        const m = cell.role.match(/\d+/);
+                                        return m ? `공통전담 ${m[0]}` : cell.role;
+                                      })()}
                                       onChange={e => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', e.target.value)}
-                                      placeholder="공통전담 1"
-                                      className={`w-full text-center font-bold text-xs px-2 py-1.5 rounded-lg border focus:outline-none transition ${
+                                      className={`w-full text-center font-bold text-xs px-1.5 py-1.5 rounded-lg border focus:outline-none transition cursor-pointer appearance-none ${
                                         cell.role
-                                          ? 'bg-slate-900 text-white border-slate-700 focus:border-cyan-400'
-                                          : 'bg-slate-950 text-slate-500 border-slate-800 focus:border-cyan-400'
+                                          ? 'bg-slate-900 text-cyan-300 border-cyan-700/80 font-black shadow-sm'
+                                          : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-700'
                                       }`}
-                                    />
+                                    >
+                                      <option value="" className="bg-slate-950 text-slate-400">-- 미배정 --</option>
+                                      {Array.from({ length: 10 }, (_, i) => {
+                                        const roleName = `공통전담 ${i + 1}`;
+                                        const pContact = getCNPostContact(roleName, cnPosts);
+                                        return (
+                                          <option key={i + 1} value={roleName} className="bg-slate-900 text-white font-medium">
+                                            {roleName} {pContact.ucap ? `(☎ ${pContact.ucap})` : ''}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
 
                                     {/* Auto-resolved 공용 UCAP Display */}
                                     {displayUcap ? (
-                                      <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-800/50 shadow-sm">
+                                      <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-black text-cyan-300 bg-cyan-950/90 px-2 py-0.5 rounded-md border border-cyan-800/60 shadow-sm">
                                         <span>📞 {displayUcap}</span>
                                       </div>
                                     ) : cell.role ? (
                                       <div className="text-[9px] text-slate-500 italic">UCAP 미등록</div>
                                     ) : null}
 
-                                    {/* Quick Hover Toolbar */}
-                                    <div className="hidden group-hover:flex items-center justify-center gap-0.5 pt-0.5">
-                                      {cnPosts.slice(0, 4).map(p => (
-                                        <button
-                                          key={p.id}
-                                          onClick={() => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', p.name)}
-                                          className="px-1 py-0.2 rounded bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-[9px] text-slate-300 font-mono transition"
-                                          title={`${p.name} (${p.ucap})`}
-                                        >
-                                          {p.name.replace('공통전담', '')}
-                                        </button>
-                                      ))}
-                                      {cell.role && (
+                                    {/* Quick Clear Button on Hover */}
+                                    {cell.role && (
+                                      <div className="hidden group-hover:flex items-center justify-center pt-0.5">
                                         <button
                                           onClick={() => handleUpdateCNGroupCell(grp.id, ts.id, d.day, 'role', '')}
-                                          className="px-1 py-0.2 rounded bg-rose-950 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] transition"
-                                          title="지우기"
+                                          className="px-2 py-0.5 rounded bg-rose-950/80 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] font-bold transition flex items-center gap-1"
+                                          title="근무자 배정 취소"
                                         >
-                                          ×
+                                          <span>취소</span>
+                                          <span>×</span>
                                         </button>
-                                      )}
-                                    </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               );
