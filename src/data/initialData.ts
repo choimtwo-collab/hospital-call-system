@@ -326,6 +326,13 @@ for (let i = 0; i < 7; i++) {
   };
 }
 
+export const areWardsEqual = (w1?: string, w2?: string): boolean => {
+  if (!w1 || !w2) return false;
+  const clean1 = w1.replace(/\s+/g, '').replace('병동', '').replace(/W$/i, '').toLowerCase();
+  const clean2 = w2.replace(/\s+/g, '').replace('병동', '').replace(/W$/i, '').toLowerCase();
+  return clean1 === clean2;
+};
+
 export const getCNPostContact = (roleName: string, cnPosts: CNPost[]): { ucap: string; phone: string } => {
   if (!roleName) return { ucap: '', phone: '' };
   const clean = roleName.replace(/\s+/g, '');

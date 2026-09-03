@@ -6,7 +6,7 @@ import {
   HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2
 } from 'lucide-react';
 import { 
-  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact 
+  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact, areWardsEqual 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
@@ -352,8 +352,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleToggleWardForPost = (postId: string, ward: string) => {
     setCnPosts(prev => prev.map(p => {
       if (p.id !== postId) return p;
-      const exists = p.wards.includes(ward);
-      const updatedWards = exists ? p.wards.filter(w => w !== ward) : [...p.wards, ward];
+      const exists = p.wards.some(w => areWardsEqual(w, ward));
+      const updatedWards = exists 
+        ? p.wards.filter(w => !areWardsEqual(w, ward)) 
+        : [...p.wards.filter(w => !areWardsEqual(w, ward)), ward];
       return { ...p, wards: updatedWards };
     }));
   };
@@ -434,12 +436,28 @@ export const AdminView: React.FC<AdminViewProps> = ({
     if (!setCnGroupSchedules) return;
     setCnGroupSchedules(prev => prev.map(g => {
       if (g.id !== groupId) return g;
-      const exists = g.wards.includes(ward);
+      const exists = g.wards.some(w => areWardsEqual(w, ward));
+      const updatedWards = exists 
+        ? g.wards.filter(w => !areWardsEqual(w, ward)) 
+        : [...g.wards.filter(w => !areWardsEqual(w, ward)), ward];
       return {
         ...g,
-        wards: exists ? g.wards.filter(w => w !== ward) : [...g.wards, ward]
+        wards: updatedWards
       };
     }));
+  };
+
+  const handleSyncGroupTitleWithWards = (groupId: string) => {
+    if (!setCnGroupSchedules) return;
+    setCnGroupSchedules(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      if (g.wards.length === 0) return g;
+      return {
+        ...g,
+        title: g.wards.join(', ')
+      };
+    }));
+    showSaveSuccess('병동 목록이 부서/관할 명칭에 자동 반영되었습니다.');
   };
 
   const handleAddCNGroup = () => {
@@ -2756,12 +2774,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             {tsIdx === 0 && (
                               <td 
                                 rowSpan={timeSlots.length} 
-                                className="align-top p-4 bg-slate-900/90 border-r-2 border-slate-700 text-left space-y-2.5"
+                                className="align-top p-4 bg-slate-900/90 border-r-2 border-slate-700 text-left space-y-3"
                               >
                                 <div>
-                                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
-                                    부서 / 관할 병동
-                                  </label>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <label className="text-[10px] text-slate-400 font-bold">
+                                      부서 / 관할 병동 명칭
+                                    </label>
+                                    {grp.wards.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSyncGroupTitleWithWards(grp.id)}
+                                        className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 underline"
+                                        title="선택된 병동 목록으로 명칭 자동 채우기"
+                                      >
+                                        명칭 자동반영
+                                      </button>
+                                    )}
+                                  </div>
                                   <input
                                     type="text"
                                     value={grp.title}
@@ -2771,23 +2801,44 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                   />
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-1">
-                                  {grp.wards.slice(0, 4).map(w => (
-                                    <span key={w} className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50 text-[10px] font-bold">
-                                      {w}
-                                    </span>
-                                  ))}
-                                  {grp.wards.length > 4 && (
-                                    <span className="text-[10px] text-slate-500 font-mono">+{grp.wards.length - 4}</span>
-                                  )}
+                                {/* Display ALL selected wards clearly with individual removal */}
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold">
+                                    <span>관할 병동 목록 ({grp.wards.length}개):</span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1 max-h-28 overflow-y-auto p-1.5 bg-slate-950/80 rounded-xl border border-slate-800">
+                                    {grp.wards.length > 0 ? (
+                                      grp.wards.map(w => (
+                                        <span 
+                                          key={w} 
+                                          className="px-2 py-0.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-800/60 text-[11px] font-extrabold flex items-center gap-1 shadow-sm"
+                                        >
+                                          <span>{w}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleWardForGroup(grp.id, w)}
+                                            className="text-cyan-500 hover:text-rose-400 text-xs font-black ml-0.5"
+                                            title={`${w} 해제`}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-[10px] text-rose-400/90 font-bold p-0.5">
+                                        ⚠️ 선택된 병동 없음
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 pt-1">
+                                <div className="flex items-center justify-between pt-1">
                                   <button
                                     onClick={() => setEditingGroupWardsId(grp.id)}
-                                    className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition"
+                                    className="px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-sm transition flex items-center gap-1"
                                   >
-                                    + 병동 칩 선택
+                                    <Plus className="w-3 h-3" />
+                                    병동 칩 선택/추가
                                   </button>
 
                                   {cnGroupSchedules.length > 1 && (
@@ -2926,6 +2977,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
           {/* ================================================================ */}
           {/* MODAL: WARD SELECTION POPOVER / MODAL                            */}
           {/* ================================================================ */}
+          {/* MODAL: POST WARD SELECTION POPOVER / MODAL */}
           {editingWardsPostId && (
             <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up">
@@ -2951,18 +3003,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto p-1">
                   {ALL_WARDS.map(ward => {
                     const currentPost = cnPosts.find(p => p.id === editingWardsPostId);
-                    const isSelected = currentPost?.wards.includes(ward);
+                    const isSelected = currentPost?.wards.some(w => areWardsEqual(w, ward));
                     return (
                       <button
                         key={ward}
                         onClick={() => handleToggleWardForPost(editingWardsPostId, ward)}
                         className={`p-2.5 rounded-xl text-xs font-bold text-center transition border ${
                           isSelected
-                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm font-black'
                             : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600'
                         }`}
                       >
-                        {ward}
+                        {ward} {isSelected ? '✓' : ''}
                       </button>
                     );
                   })}
@@ -2984,62 +3036,101 @@ export const AdminView: React.FC<AdminViewProps> = ({
           )}
 
           {/* MODAL: GROUP WARD SELECTION POPOVER / MODAL */}
-          {editingGroupWardsId && (
-            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div>
-                    <h4 className="text-base font-extrabold text-white flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-cyan-400" />
-                      관할 병동 선택 - {cnGroupSchedules?.find(g => g.id === editingGroupWardsId)?.title}
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      해당 근무표 그룹이 담당할 병동을 클릭하여 선택하거나 해제하세요.
-                    </p>
+          {editingGroupWardsId && (() => {
+            const currentGrp = cnGroupSchedules?.find(g => g.id === editingGroupWardsId);
+            return (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-scale-up">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div>
+                      <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-cyan-400" />
+                        관할 병동 선택 - {currentGrp?.title}
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        해당 근무표 그룹이 담당할 병동을 클릭하여 선택하거나 해제하세요.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setEditingGroupWardsId(null)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setEditingGroupWardsId(null)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
 
-                {/* Ward Chips Grid */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto p-1">
-                  {ALL_WARDS.map(ward => {
-                    const currentGrp = cnGroupSchedules?.find(g => g.id === editingGroupWardsId);
-                    const isSelected = currentGrp?.wards.includes(ward);
-                    return (
-                      <button
-                        key={ward}
-                        onClick={() => handleToggleWardForGroup(editingGroupWardsId, ward)}
-                        className={`p-2.5 rounded-xl text-xs font-bold text-center transition border ${
-                          isSelected
-                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
-                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600'
-                        }`}
-                      >
-                        {ward}
-                      </button>
-                    );
-                  })}
-                </div>
+                  {/* Selected wards real-time preview in modal */}
+                  <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-bold">
+                        현재 선택된 병동 (<strong className="text-cyan-400 font-mono">{currentGrp?.wards.length || 0}개</strong>):
+                      </span>
+                      {currentGrp && currentGrp.wards.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSyncGroupTitleWithWards(editingGroupWardsId)}
+                          className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold underline"
+                        >
+                          명칭에 자동 반영
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 max-h-20 overflow-y-auto">
+                      {currentGrp?.wards && currentGrp.wards.length > 0 ? (
+                        currentGrp.wards.map(w => (
+                          <span key={w} className="px-2 py-0.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-800/60 text-xs font-bold flex items-center gap-1">
+                            {w}
+                            <span
+                              onClick={() => handleToggleWardForGroup(editingGroupWardsId, w)}
+                              className="cursor-pointer text-cyan-500 hover:text-rose-400 ml-0.5 font-black"
+                              title="해제"
+                            >
+                              ×
+                            </span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">선택된 병동이 없습니다. 아래 버튼을 눌러 추가하세요.</span>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                  <span className="text-xs text-slate-400">
-                    선택된 병동 수: <strong className="text-cyan-400">{cnGroupSchedules?.find(g => g.id === editingGroupWardsId)?.wards.length || 0}개</strong>
-                  </span>
-                  <button
-                    onClick={() => setEditingGroupWardsId(null)}
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20"
-                  >
-                    선택 완료
-                  </button>
+                  {/* Ward Chips Grid */}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto p-1">
+                    {ALL_WARDS.map(ward => {
+                      const isSelected = currentGrp?.wards.some(w => areWardsEqual(w, ward));
+                      return (
+                        <button
+                          key={ward}
+                          type="button"
+                          onClick={() => handleToggleWardForGroup(editingGroupWardsId, ward)}
+                          className={`p-2.5 rounded-xl text-xs font-bold text-center transition border ${
+                            isSelected
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm font-black'
+                              : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600'
+                          }`}
+                        >
+                          {ward} {isSelected ? '✓' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                    <span className="text-xs text-slate-400">
+                      총 <strong className="text-cyan-400 font-mono">{currentGrp?.wards.length || 0}개</strong> 선택됨
+                    </span>
+                    <button
+                      onClick={() => setEditingGroupWardsId(null)}
+                      className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20"
+                    >
+                      선택 완료
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
         </div>
       )}

@@ -1,5 +1,5 @@
 import { 
-  DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS, getCNPostContact 
+  DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS, getCNPostContact, areWardsEqual 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
@@ -327,15 +327,11 @@ export function evaluateDutyRules(
 
     // 1순위: 이미지 1 공식 통합 주간 근무표 (cnGroupSchedules)
     const matchedGroup = cnGroupSchedules.find(g => {
-      if (g.wards && g.wards.some(w => {
-        const cleanW = w.replace(/\s+/g, '').replace('병동', '').toLowerCase();
-        const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '').toLowerCase();
-        return cleanW === cleanSel || cleanSel.includes(cleanW) || cleanW.includes(cleanSel);
-      })) return true;
+      if (g.wards && g.wards.some(w => areWardsEqual(w, selectedWard))) return true;
       const cleanTitle = g.title.replace(/\s+/g, '').replace('병동', '').toLowerCase();
       const cleanSel = selectedWard.replace(/\s+/g, '').replace('병동', '').toLowerCase();
       return cleanTitle.includes(cleanSel);
-    }) || (cnGroupSchedules.length > 0 ? cnGroupSchedules[0] : null);
+    });
 
     if (matchedGroup && targetTimeSlot) {
       const shiftCell = matchedGroup.schedule?.[targetTimeSlot.id]?.[shiftDayOfWeek];
