@@ -6,12 +6,12 @@ import {
   HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2
 } from 'lucide-react';
 import { 
-  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact, areWardsEqual 
+  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact, areWardsEqual, initialTasks 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
   TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory, 
-  DutyPhoneItem, CNGroupSchedule, CNShiftCell 
+  DutyPhoneItem, CNGroupSchedule, CNShiftCell, SpecialtyType, TimeRuleType 
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
@@ -97,12 +97,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [excelPreview, setExcelPreview] = useState<ParsedDutyResult | null>(null);
   const [isExcelUploading, setIsExcelUploading] = useState(false);
 
-  // 업무 마스터 신규 추가 폼 상태
+  // 업무 마스터 신규 추가 폼 상태 (이미지 2 마스터 테이블 필드 규격)
+  const [newTaskCode, setNewTaskCode] = useState('');
   const [newTaskName, setNewTaskName] = useState('');
-  const [newTaskDept, setNewTaskDept] = useState<'내과' | '비내과' | 'ALL'>('내과');
-  const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>('인턴 필수');
+  const [newTaskSpecialty, setNewTaskSpecialty] = useState<SpecialtyType>('내과계');
+  const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>('검사');
+  const [newTaskNurseSupport, setNewTaskNurseSupport] = useState<'Y' | 'N'>('N');
+  const [newTaskTimeRule, setNewTaskTimeRule] = useState<TimeRuleType>('정규/당직 분리형');
   const [newTaskDesc, setNewTaskDesc] = useState('');
+
+  // 업무 마스터 필터 및 검색
+  const [taskSpecialtyFilter, setTaskSpecialtyFilter] = useState<string>('ALL');
   const [taskCategoryFilter, setTaskCategoryFilter] = useState<string>('ALL');
+  const [taskNurseFilter, setTaskNurseFilter] = useState<string>('ALL');
+  const [taskSearchKeyword, setTaskSearchKeyword] = useState<string>('');
+
+  // 업무 마스터 편집 모달 상태
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
   // 규칙 빌더 신규 추가 모달/상태
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
@@ -512,29 +523,72 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
   };
 
-  // --- Task Master Handlers ---
+  // --- Task Master Handlers (Image 2 Field Specification) ---
+  const handleAutoGenerateTaskCode = () => {
+    const raw = newTaskName.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').slice(0, 12);
+    const code = raw ? `TSK_${raw}` : `TSK_${Date.now().toString().slice(-6)}`;
+    setNewTaskCode(code);
+  };
+
   const handleAddTask = () => {
     if (!newTaskName.trim()) {
-      alert('업무명을 입력해주세요.');
+      alert('업무명 (Task_Name)을 입력해주세요.');
       return;
     }
+
+    const code = (newTaskCode.trim() || `TSK_${Date.now().toString().slice(-6)}`).toUpperCase();
+    if (tasks.some(t => t.id === code || t.code === code)) {
+      alert(`이미 존재하는 업무 코드(${code})입니다. 다른 코드를 지정해주세요.`);
+      return;
+    }
+
+    const deptCompat: '내과' | '비내과' | 'ALL' = 
+      newTaskSpecialty === '내과계' ? '내과' : (newTaskSpecialty === '비내과계' ? '비내과' : 'ALL');
+
     const newTask: TaskItem = {
-      id: `task-${Date.now()}`,
+      id: code,
+      code,
       name: newTaskName.trim(),
-      dept: newTaskDept,
+      specialtyType: newTaskSpecialty,
+      dept: deptCompat,
       category: newTaskCategory,
+      isNurseSupport: newTaskNurseSupport,
+      timeRuleType: newTaskTimeRule,
       description: newTaskDesc.trim() || undefined
     };
+
     setTasks(prev => [...prev, newTask]);
+    setNewTaskCode('');
     setNewTaskName('');
     setNewTaskDesc('');
-    showSaveSuccess('새 업무가 마스터에 성공적으로 등록되었습니다.');
+    showSaveSuccess(`[${newTask.code}] '${newTask.name}' 업무가 마스터에 성공적으로 등록되었습니다.`);
+  };
+
+  const handleUpdateTask = () => {
+    if (!editingTask || !editingTask.name.trim()) return;
+    const deptCompat: '내과' | '비내과' | 'ALL' = 
+      editingTask.specialtyType === '내과계' ? '내과' : (editingTask.specialtyType === '비내과계' ? '비내과' : 'ALL');
+
+    setTasks(prev => prev.map(t => t.id === editingTask.id ? {
+      ...editingTask,
+      code: editingTask.code || editingTask.id,
+      dept: deptCompat
+    } : t));
+    setEditingTask(null);
+    showSaveSuccess('업무 마스터 설정이 성공적으로 수정되었습니다.');
   };
 
   const handleDeleteTask = (id: string, name: string) => {
-    if (confirm(`'${name}' 업무를 삭제하시겠습니까?`)) {
+    if (confirm(`'${name}' 업무를 마스터에서 삭제하시겠습니까?`)) {
       setTasks(prev => prev.filter(t => t.id !== id));
       showSaveSuccess('업무가 삭제되었습니다.');
+    }
+  };
+
+  const handleResetToStandardTasks = () => {
+    if (confirm('업무 마스터를 표준 12개 업무 목록으로 초기화하시겠습니까?')) {
+      setTasks(initialTasks);
+      showSaveSuccess('표준 업무 마스터 12개 목록으로 초기화되었습니다.');
     }
   };
 
@@ -1173,160 +1227,507 @@ export const AdminView: React.FC<AdminViewProps> = ({
       )}
 
       {/* ==================================================================== */}
-      {/* TAB 2: TASK MASTER MANAGEMENT                                       */}
+      {/* TAB 2: TASK MASTER MANAGEMENT (IMAGE 2 FIELD SPECIFICATION)         */}
       {/* ==================================================================== */}
       {adminTab === 'tasks' && (
         <div className="space-y-6">
           {/* New Task Form */}
-          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-cyan-400" />
-              새로운 병원 업무 등록
-            </h3>
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-5 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-cyan-400" />
+                  새로운 병원 업무 마스터 등록 (표준 필드 규격)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  간호사 호출 화면과 당직 매칭 엔진에 실시간 연동되는 7대 표준 필드 기준입니다.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <button
+                onClick={handleResetToStandardTasks}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                표준 12개 업무 초기화
+              </button>
+            </div>
+
+            {/* 7 Fields Form Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+              {/* 1. 업무 코드 (Task_Code) */}
+              <div className="sm:col-span-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                    <span>1. 업무 코드</span>
+                    <span className="text-[10px] text-cyan-400 font-mono font-normal">(Task_Code)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateTaskCode}
+                    className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300"
+                  >
+                    코드 자동생성
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={newTaskCode}
+                  onChange={e => setNewTaskCode(e.target.value.toUpperCase())}
+                  placeholder="예: TSK_EKG_P"
+                  className="w-full bg-slate-950/80 border border-slate-700 font-mono uppercase rounded-xl px-3 py-2 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              {/* 2. 업무명 (Task_Name) */}
               <div className="sm:col-span-5">
-                <label className="text-[11px] font-bold text-slate-400 mb-1 block">업무 명칭</label>
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>2. 업무명</span>
+                  <span className="text-[10px] text-cyan-400 font-normal ml-1">(Task_Name - 호출 화면 표기)</span>
+                </label>
                 <input
                   type="text"
                   value={newTaskName}
                   onChange={e => setNewTaskName(e.target.value)}
-                  placeholder="예: 뇌척수액 검사 동의서, PICC 세척 등"
-                  className="w-full bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder="예: EKG(P) (추가 심전도)"
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-cyan-400"
                 />
               </div>
 
+              {/* 3. 진료계열 구분 (Specialty_Type) */}
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-bold text-slate-400 mb-1 block">진료계열</label>
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>3. 진료계열 구분</span>
+                  <span className="text-[10px] text-cyan-400 font-normal ml-1">(Specialty)</span>
+                </label>
                 <select
-                  value={newTaskDept}
-                  onChange={e => setNewTaskDept(e.target.value as any)}
-                  className="w-full bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  value={newTaskSpecialty}
+                  onChange={e => setNewTaskSpecialty(e.target.value as SpecialtyType)}
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-cyan-400"
                 >
-                  <option value="내과">내과</option>
-                  <option value="비내과">비내과</option>
-                  <option value="ALL">전체 (공통)</option>
+                  <option value="내과계">내과계</option>
+                  <option value="비내과계">비내과계</option>
+                  <option value="공통">공통</option>
                 </select>
               </div>
 
+              {/* 4. 업무 분류 카테고리 (Category) */}
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-bold text-slate-400 mb-1 block">업무 분류 카테고리</label>
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>4. 업무 분류</span>
+                  <span className="text-[10px] text-cyan-400 font-normal ml-1">(Category)</span>
+                </label>
                 <select
                   value={newTaskCategory}
-                  onChange={e => setNewTaskCategory(e.target.value as any)}
-                  className="w-full bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  onChange={e => setNewTaskCategory(e.target.value as TaskCategory)}
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-cyan-400"
                 >
-                  <option value="인턴 필수">인턴 필수</option>
-                  <option value="공통 전담 지원">공통 전담 지원</option>
-                  <option value="진료과 전담 전용">진료과 전담 전용</option>
-                  <option value="특수 예외">특수 예외</option>
+                  <option value="검사">검사</option>
+                  <option value="치료 및 처치">치료 및 처치</option>
+                  <option value="동의서">동의서</option>
+                  <option value="사망 및 기타">사망 및 기타</option>
                 </select>
               </div>
 
+              {/* 5. 전담간호사 지원 가능 여부 (Is_Nurse_Support) */}
               <div className="sm:col-span-3">
-                <label className="text-[11px] font-bold text-slate-400 mb-1 block">상세 설명</label>
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>5. 전담간호사 지원 여부</span>
+                  <span className="text-[10px] text-emerald-400 font-normal ml-1">(Is_Nurse_Support)</span>
+                </label>
+                <select
+                  value={newTaskNurseSupport}
+                  onChange={e => setNewTaskNurseSupport(e.target.value as 'Y' | 'N')}
+                  className={`w-full bg-slate-950/80 border rounded-xl px-3 py-2 text-xs font-bold focus:outline-none ${
+                    newTaskNurseSupport === 'Y' 
+                      ? 'text-emerald-400 border-emerald-500/50' 
+                      : 'text-slate-300 border-slate-700'
+                  }`}
+                >
+                  <option value="Y">Y (단순드레싱 등 - 전담 지원 가능)</option>
+                  <option value="N">N (수혈동의서 등 - 전담 지원 불가)</option>
+                </select>
+              </div>
+
+              {/* 6. 시간대별 매칭 룰 (Time_Rule_Type) */}
+              <div className="sm:col-span-3">
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>6. 시간대별 매칭 룰</span>
+                  <span className="text-[10px] text-cyan-400 font-normal ml-1">(Time_Rule_Type)</span>
+                </label>
+                <select
+                  value={newTaskTimeRule}
+                  onChange={e => setNewTaskTimeRule(e.target.value as TimeRuleType)}
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-cyan-400"
+                >
+                  <option value="정규/당직 분리형">정규/당직 분리형 (시간대에 따라 변경)</option>
+                  <option value="시간대 무관 고정형">시간대 무관 고정형 (항상 고정)</option>
+                  <option value="특정 시간 예외형">특정 시간 예외형 (새벽/주말 등 특수)</option>
+                </select>
+              </div>
+
+              {/* 7. 상세 설명 및 매칭 가이드 (Description) */}
+              <div className="sm:col-span-6">
+                <label className="text-[11px] font-bold text-slate-300 mb-1 block">
+                  <span>7. 상세 설명 및 매칭 가이드</span>
+                  <span className="text-[10px] text-slate-400 font-normal ml-1">(간호사 호출 화면 안내 문구)</span>
+                </label>
                 <input
                   type="text"
                   value={newTaskDesc}
                   onChange={e => setNewTaskDesc(e.target.value)}
-                  placeholder="설명 또는 주의사항"
-                  className="w-full bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder='예: "06:00~08:00 평일 EKG는 임상병리사 담당입니다."'
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-2 border-t border-slate-800/80">
               <button
                 onClick={handleAddTask}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 flex items-center gap-1.5"
+                className="px-6 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition"
               >
                 <Plus className="w-4 h-4" />
-                업무 등록하기
+                업무 등록하기 (마스터 저장)
               </button>
             </div>
           </div>
 
-          {/* Task List Table */}
+          {/* Task List Table with Comprehensive Filters */}
           <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                   <Tag className="w-5 h-5 text-cyan-400" />
                   업무 마스터 목록 ({tasks.length}개)
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  등록된 업무는 간호사 화면의 업무 선택 및 검색 드롭다운에 즉시 반영됩니다.
+                  등록된 7개 필드 정의에 따라 간호사 화면의 업무 드롭다운 및 콜 매칭 엔진에 즉시 적용됩니다.
                 </p>
               </div>
 
-              {/* Category Filter Chips */}
-              <div className="flex items-center gap-1.5 overflow-x-auto">
-                {['ALL', '인턴 필수', '공통 전담 지원', '진료과 전담 전용', '특수 예외'].map(cat => (
+              {/* Search Box */}
+              <div className="w-full lg:w-72 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={taskSearchKeyword}
+                  onChange={e => setTaskSearchKeyword(e.target.value)}
+                  placeholder="업무명 또는 코드 검색..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80 text-xs">
+              <span className="text-slate-400 font-bold text-[11px] mr-1 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5 text-cyan-400" /> 필터:
+              </span>
+
+              {/* 진료계열 필터 */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                {['ALL', '내과계', '비내과계', '공통'].map(spec => (
+                  <button
+                    key={spec}
+                    onClick={() => setTaskSpecialtyFilter(spec)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      taskSpecialtyFilter === spec
+                        ? 'bg-cyan-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {spec === 'ALL' ? '전체 계열' : spec}
+                  </button>
+                ))}
+              </div>
+
+              {/* 카테고리 필터 */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                {['ALL', '검사', '치료 및 처치', '동의서', '사망 및 기타'].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setTaskCategoryFilter(cat)}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
                       taskCategoryFilter === cat
                         ? 'bg-cyan-500 text-slate-950'
-                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    {cat === 'ALL' ? '전체 보기' : cat}
+                    {cat === 'ALL' ? '전체 카테고리' : cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* 전담간호사 지원 필터 */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                {[
+                  { key: 'ALL', label: '전담지원 전체' },
+                  { key: 'Y', label: '지원 가능(Y)' },
+                  { key: 'N', label: '지원 불가(N)' }
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => setTaskNurseFilter(item.key)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      taskNurseFilter === item.key
+                        ? 'bg-emerald-400 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-800/90 text-slate-300 font-bold uppercase tracking-wider">
+            {/* Task Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-800 shadow-2xl">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-900 text-slate-300 font-bold uppercase tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="p-3 w-16">계열</th>
-                    <th className="p-3">업무 명칭</th>
-                    <th className="p-3 w-36">분류 태그</th>
-                    <th className="p-3">상세 설명</th>
-                    <th className="p-3 w-16 text-center">삭제</th>
+                    <th className="p-3 w-28 whitespace-nowrap">업무 코드</th>
+                    <th className="p-3 w-20 whitespace-nowrap">진료계열</th>
+                    <th className="p-3 whitespace-nowrap">업무명 (Task_Name)</th>
+                    <th className="p-3 w-28 whitespace-nowrap">업무 분류</th>
+                    <th className="p-3 w-24 text-center whitespace-nowrap">전담 지원</th>
+                    <th className="p-3 w-32 whitespace-nowrap">시간 매칭 룰</th>
+                    <th className="p-3 whitespace-nowrap">상세 설명 및 매칭 가이드</th>
+                    <th className="p-3 w-20 text-center whitespace-nowrap">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
                   {tasks
-                    .filter(t => taskCategoryFilter === 'ALL' || t.category === taskCategoryFilter)
-                    .map(task => (
-                      <tr key={task.id} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
-                            task.dept === '내과' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 
-                            (task.dept === '비내과' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-700 text-slate-300')
-                          }`}>
-                            {task.dept}
-                          </span>
-                        </td>
-                        <td className="p-3 font-bold text-white">{task.name}</td>
-                        <td className="p-3">
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${
-                            task.category === '인턴 필수' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' :
-                            (task.category === '공통 전담 지원' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                            (task.category === '진료과 전담 전용' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
-                            'bg-amber-500/20 text-amber-300 border border-amber-500/30'))
-                          }`}>
-                            {task.category}
-                          </span>
-                        </td>
-                        <td className="p-3 text-slate-400">{task.description || '-'}</td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => handleDeleteTask(task.id, task.name)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    .filter(t => {
+                      const matchSpec = taskSpecialtyFilter === 'ALL' || t.specialtyType === taskSpecialtyFilter || (t.dept === '내과' && taskSpecialtyFilter === '내과계') || (t.dept === '비내과' && taskSpecialtyFilter === '비내과계') || (t.dept === 'ALL' && taskSpecialtyFilter === '공통');
+                      const matchCat = taskCategoryFilter === 'ALL' || t.category === taskCategoryFilter;
+                      const isSupp = t.isNurseSupport === true || t.isNurseSupport === 'Y' ? 'Y' : 'N';
+                      const matchNurse = taskNurseFilter === 'ALL' || isSupp === taskNurseFilter;
+                      const q = taskSearchKeyword.toLowerCase().trim();
+                      const matchSearch = !q || t.name.toLowerCase().includes(q) || (t.code || t.id).toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
+                      return matchSpec && matchCat && matchNurse && matchSearch;
+                    })
+                    .map(task => {
+                      const isSupp = task.isNurseSupport === true || task.isNurseSupport === 'Y';
+                      return (
+                        <tr key={task.id} className="hover:bg-slate-800/40 transition">
+                          {/* 1. 업무 코드 */}
+                          <td className="p-3 font-mono text-[11px] text-cyan-300 font-extrabold whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                              {task.code || task.id}
+                            </span>
+                          </td>
+
+                          {/* 2. 진료계열 */}
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                              task.specialtyType === '내과계' || task.dept === '내과'
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                : (task.specialtyType === '비내과계' || task.dept === '비내과'
+                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                  : 'bg-purple-500/20 text-purple-300 border border-purple-500/30')
+                            }`}>
+                              {task.specialtyType || (task.dept === '내과' ? '내과계' : (task.dept === '비내과' ? '비내과계' : '공통'))}
+                            </span>
+                          </td>
+
+                          {/* 3. 업무명 */}
+                          <td className="p-3 font-bold text-white whitespace-nowrap">
+                            {task.name}
+                          </td>
+
+                          {/* 4. 업무 분류 */}
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${
+                              task.category === '검사' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' :
+                              (task.category === '치료 및 처치' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                              (task.category === '동의서' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                              'bg-rose-500/20 text-rose-300 border border-rose-500/30'))
+                            }`}>
+                              {task.category}
+                            </span>
+                          </td>
+
+                          {/* 5. 전담간호사 지원 */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {isSupp ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                Y 지원
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-800 text-slate-400 border border-slate-700">
+                                N 불가
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 6. 시간대별 매칭 룰 */}
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                              task.timeRuleType === '특정 시간 예외형'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : (task.timeRuleType === '시간대 무관 고정형'
+                                  ? 'bg-slate-800 text-slate-300 border border-slate-700'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30')
+                            }`}>
+                              {task.timeRuleType || '정규/당직 분리형'}
+                            </span>
+                          </td>
+
+                          {/* 7. 상세 설명 및 매칭 가이드 */}
+                          <td className="p-3 text-slate-400 text-xs">
+                            {task.description ? (
+                              <span className="line-clamp-1" title={task.description}>
+                                {task.description}
+                              </span>
+                            ) : (
+                              <span className="text-slate-600">-</span>
+                            )}
+                          </td>
+
+                          {/* 8. 관리 (수정 / 삭제) */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => setEditingTask(task)}
+                                className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition"
+                                title="업무 수정"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(task.id, task.name)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                                title="업무 삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Edit Task Modal */}
+          {editingTask && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+              <div className="glass-panel p-6 rounded-3xl border border-cyan-500/50 bg-slate-900 shadow-2xl max-w-2xl w-full space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <Edit3 className="w-5 h-5 text-cyan-400" />
+                    업무 마스터 필드 수정
+                  </h3>
+                  <button onClick={() => setEditingTask(null)} className="p-1 text-slate-400 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">업무 코드 (Task_Code)</label>
+                    <input
+                      type="text"
+                      value={editingTask.code || editingTask.id}
+                      onChange={e => setEditingTask({ ...editingTask, code: e.target.value.toUpperCase() })}
+                      className="w-full bg-slate-950 border border-slate-700 font-mono uppercase rounded-xl px-3 py-2 text-cyan-300 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">업무명 (Task_Name)</label>
+                    <input
+                      type="text"
+                      value={editingTask.name}
+                      onChange={e => setEditingTask({ ...editingTask, name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">진료계열 구분 (Specialty_Type)</label>
+                    <select
+                      value={editingTask.specialtyType || '공통'}
+                      onChange={e => setEditingTask({ ...editingTask, specialtyType: e.target.value as SpecialtyType })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
+                    >
+                      <option value="내과계">내과계</option>
+                      <option value="비내과계">비내과계</option>
+                      <option value="공통">공통</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">업무 분류 카테고리 (Category)</label>
+                    <select
+                      value={editingTask.category}
+                      onChange={e => setEditingTask({ ...editingTask, category: e.target.value as TaskCategory })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
+                    >
+                      <option value="검사">검사</option>
+                      <option value="치료 및 처치">치료 및 처치</option>
+                      <option value="동의서">동의서</option>
+                      <option value="사망 및 기타">사망 및 기타</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">전담간호사 지원 여부 (Is_Nurse_Support)</label>
+                    <select
+                      value={editingTask.isNurseSupport === true || editingTask.isNurseSupport === 'Y' ? 'Y' : 'N'}
+                      onChange={e => setEditingTask({ ...editingTask, isNurseSupport: e.target.value as 'Y' | 'N' })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
+                    >
+                      <option value="Y">Y (단순드레싱 등 - 지원 가능)</option>
+                      <option value="N">N (수혈동의서 등 - 지원 불가)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">시간대별 매칭 룰 (Time_Rule_Type)</label>
+                    <select
+                      value={editingTask.timeRuleType || '정규/당직 분리형'}
+                      onChange={e => setEditingTask({ ...editingTask, timeRuleType: e.target.value as TimeRuleType })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
+                    >
+                      <option value="정규/당직 분리형">정규/당직 분리형</option>
+                      <option value="시간대 무관 고정형">시간대 무관 고정형</option>
+                      <option value="특정 시간 예외형">특정 시간 예외형</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">상세 설명 및 매칭 가이드 (Description)</label>
+                    <input
+                      type="text"
+                      value={editingTask.description || ''}
+                      onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
+                      placeholder="간호사 호출 화면에 띄워줄 안내 문구"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    onClick={() => setEditingTask(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleUpdateTask}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20"
+                  >
+                    수정사항 저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -63,7 +63,46 @@ export default function App() {
 
   const [tasks, setTasks] = useState<TaskItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
-    return saved ? JSON.parse(saved) : initialTasks;
+    if (!saved) return initialTasks;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialTasks;
+      return parsed.map((item: any) => {
+        const specialtyType: any = item.specialtyType || (item.dept === '내과' ? '내과계' : (item.dept === '비내과' ? '비내과계' : '공통'));
+        let category = item.category;
+        if (!['검사', '치료 및 처치', '동의서', '사망 및 기타'].includes(category)) {
+          if (item.name?.includes('검사') || item.name?.includes('EKG') || item.name?.includes('ABGA') || item.name?.includes('채혈')) {
+            category = '검사';
+          } else if (item.name?.includes('동의서')) {
+            category = '동의서';
+          } else if (item.name?.includes('사망') || item.name?.includes('Call')) {
+            category = '사망 및 기타';
+          } else {
+            category = '치료 및 처치';
+          }
+        }
+        const isNurseSupport = item.isNurseSupport !== undefined 
+          ? (item.isNurseSupport === true || item.isNurseSupport === 'Y' ? 'Y' : 'N')
+          : (item.category === '공통 전담 지원' ? 'Y' : 'N');
+        const timeRuleType = item.timeRuleType || (
+          item.name?.includes('일요일') || item.name?.includes('주말') || item.name?.includes('06:00') ? '특정 시간 예외형' :
+          (item.name?.includes('사망선언') || item.name?.includes('Assist') ? '시간대 무관 고정형' : '정규/당직 분리형')
+        );
+        return {
+          id: item.id || `TSK_${Date.now()}`,
+          code: item.code || item.id,
+          name: item.name || '',
+          specialtyType,
+          dept: specialtyType === '내과계' ? '내과' : (specialtyType === '비내과계' ? '비내과' : 'ALL'),
+          category,
+          isNurseSupport,
+          timeRuleType,
+          description: item.description || ''
+        };
+      });
+    } catch {
+      return initialTasks;
+    }
   });
 
   const [customRules, setCustomRules] = useState<CustomRule[]>(() => {

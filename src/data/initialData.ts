@@ -62,30 +62,149 @@ export const ALL_WARDS = [
   'AKU', 'DR', 'DSR', 'MICU', 'SICU', '주사실', '한방', '분만장', 'NICU'
 ];
 
-// 초기 업무 마스터 정의
+// 초기 업무 마스터 정의 (새로운 마스터 테이블 필드 규격)
 export const initialTasks: TaskItem[] = [
-  // 내과계 업무
-  { id: 'task-im-1', name: 'EKG(P), 수혈동의서, T-tube 교체, 사망선언', dept: '내과', category: '인턴 필수', description: '인턴 고유 업무' },
-  { id: 'task-im-2', name: 'ABGA/Line 통한 채혈 및 Blood culture', dept: '내과', category: '인턴 필수', description: '채혈 및 배양 검사' },
-  { id: 'task-im-3', name: '그외 술기 및 동의서', dept: '내과', category: '공통 전담 지원', description: '공통 전담간호사 지원 업무' },
-  { id: 'task-im-4', name: 'Primary Call', dept: '내과', category: '진료과 전담 전용', description: '당직 전담간호사 우선' },
-
-  // 비내과계 일반 업무
-  { id: 'task-non-1', name: 'EKG(P), 수혈동의서, T-tube 교체', dept: '비내과', category: '인턴 필수', description: '비내과 일반 인턴 술기' },
-  { id: 'task-non-2', name: 'ABGA/Line 통한 채혈 및 Blood culture', dept: '비내과', category: '인턴 필수', description: '비내과 채혈 업무' },
-  { id: 'task-non-3', name: '그외 술기 및 동의서', dept: '비내과', category: '공통 전담 지원', description: '공통 전담간호사 지원' },
-
-  // 비내과계 특수/예외 업무
-  { id: 'task-ex-1', name: '통합의학과 사망선언', dept: '비내과', category: '특수 예외', description: '비내과2(5-4081) 고정' },
-  { id: 'task-ex-2', name: '주말/휴일 통합의학과 3단계 이상 sore 드레싱', dept: '비내과', category: '특수 예외', description: '비내과1(5-4080) 고정' },
-  { id: 'task-ex-3', name: '일요일 UR Op site dressing', dept: '비내과', category: '특수 예외', description: '일요일 비내과1(5-4080) 고정' },
-  { id: 'task-ex-4', name: '일요일 AN 마취동의서', dept: '비내과', category: '특수 예외', description: '일요일 비내과1(5-4080) 고정' },
-  { id: 'task-ex-5', name: '응급수술 Assist', dept: '비내과', category: '특수 예외', description: '1순위 비내과1, 2순위 비내과2' }
+  {
+    id: 'TSK_EKG_P',
+    code: 'TSK_EKG_P',
+    name: 'EKG(P) (추가 심전도)',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '검사',
+    isNurseSupport: 'N',
+    timeRuleType: '특정 시간 예외형',
+    description: '06:00~08:00 평일 EKG는 임상병리사 담당입니다.'
+  },
+  {
+    id: 'TSK_BLOOD_CON',
+    code: 'TSK_BLOOD_CON',
+    name: '수혈동의서',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '동의서',
+    isNurseSupport: 'N',
+    timeRuleType: '정규/당직 분리형',
+    description: '정규시간 해당과 인턴 / 야간·당직 내과1 또는 비내과 담당'
+  },
+  {
+    id: 'TSK_ABGA_CULT',
+    code: 'TSK_ABGA_CULT',
+    name: 'ABGA/Line 통한 채혈 및 Blood culture',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '검사',
+    isNurseSupport: 'Y',
+    timeRuleType: '정규/당직 분리형',
+    description: '정규 해당과 인턴 / 야간 MICU 내과1, 병동 전담간호사 지원'
+  },
+  {
+    id: 'TSK_GEN_PROC',
+    code: 'TSK_GEN_PROC',
+    name: '그외 술기 및 동의서',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '치료 및 처치',
+    isNurseSupport: 'Y',
+    timeRuleType: '정규/당직 분리형',
+    description: '평일 주간 및 야간 공통 전담간호사 지원 (단순드레싱 등)'
+  },
+  {
+    id: 'TSK_TTUBE',
+    code: 'TSK_TTUBE',
+    name: 'T-tube 교체',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    timeRuleType: '정규/당직 분리형',
+    description: '정규 해당과 인턴 / 당직 시간 당직의 수행'
+  },
+  {
+    id: 'TSK_DEATH_INT',
+    code: 'TSK_DEATH_INT',
+    name: '통합의학과 사망선언',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'N',
+    timeRuleType: '시간대 무관 고정형',
+    description: '비내과 당직인턴 2(5-4081) 고정 매칭'
+  },
+  {
+    id: 'TSK_SORE_DRESS',
+    code: 'TSK_SORE_DRESS',
+    name: '주말/휴일 통합의학과 3단계 이상 sore 드레싱',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    timeRuleType: '특정 시간 예외형',
+    description: '주말/공휴일 비내과 당직인턴 1(5-4080) 고정'
+  },
+  {
+    id: 'TSK_UR_DRESS',
+    code: 'TSK_UR_DRESS',
+    name: '일요일 UR Op site dressing',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    timeRuleType: '특정 시간 예외형',
+    description: '일요일 비내과 1(5-4080) 고정'
+  },
+  {
+    id: 'TSK_AN_CONSENT',
+    code: 'TSK_AN_CONSENT',
+    name: '일요일 AN 마취동의서',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '동의서',
+    isNurseSupport: 'N',
+    timeRuleType: '특정 시간 예외형',
+    description: '일요일 비내과 1(5-4080) 고정'
+  },
+  {
+    id: 'TSK_EMERG_OR',
+    code: 'TSK_EMERG_OR',
+    name: '응급수술 Assist',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    timeRuleType: '시간대 무관 고정형',
+    description: '1순위 비내과 1(5-4080), 2순위 비내과 2(5-4081)'
+  },
+  {
+    id: 'TSK_PRIM_CALL',
+    code: 'TSK_PRIM_CALL',
+    name: 'Primary Call',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'Y',
+    timeRuleType: '정규/당직 분리형',
+    description: '전담간호사 우선 배정 (병동 그룹 A)'
+  },
+  {
+    id: 'TSK_DEATH_IM',
+    code: 'TSK_DEATH_IM',
+    name: '내과계 사망선언',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'N',
+    timeRuleType: '정규/당직 분리형',
+    description: '정규 해당과 인턴 / 야간 내과 당직인턴 1·2 담당'
+  }
 ];
 
 export const TASK_OPTIONS: Record<DepartmentType, string[]> = {
-  '내과': initialTasks.filter(t => t.dept === '내과' || t.dept === 'ALL').map(t => t.name),
-  '비내과': initialTasks.filter(t => t.dept === '비내과' || t.dept === 'ALL').map(t => t.name)
+  '내과': initialTasks
+    .filter(t => t.specialtyType === '내과계' || t.specialtyType === '공통' || t.dept === '내과' || t.dept === 'ALL')
+    .map(t => t.name),
+  '비내과': initialTasks
+    .filter(t => t.specialtyType === '비내과계' || t.specialtyType === '공통' || t.dept === '비내과' || t.dept === 'ALL')
+    .map(t => t.name)
 };
 
 // 동적 규칙 (Rule Builder 기본 탑재 룰)

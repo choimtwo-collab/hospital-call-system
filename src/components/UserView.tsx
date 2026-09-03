@@ -70,15 +70,20 @@ export const UserView: React.FC<UserViewProps> = ({
   // Filter tasks based on selected department and search query
   const availableTasks = useMemo(() => {
     return tasks.filter(t => {
-      const matchDept = t.dept === selectedDept || t.dept === 'ALL';
-      const matchQuery = !taskSearchQuery || t.name.toLowerCase().includes(taskSearchQuery.toLowerCase());
+      const taskDept = t.dept || (t.specialtyType === '내과계' ? '내과' : (t.specialtyType === '비내과계' ? '비내과' : 'ALL'));
+      const matchDept = taskDept === selectedDept || taskDept === 'ALL' || t.specialtyType === '공통';
+      const q = taskSearchQuery.toLowerCase().trim();
+      const matchQuery = !q || t.name.toLowerCase().includes(q) || (t.code || '').toLowerCase().includes(q) || (t.category || '').toLowerCase().includes(q);
       return matchDept && matchQuery;
     });
   }, [tasks, selectedDept, taskSearchQuery]);
 
   // Set default task when department changes
   useEffect(() => {
-    const defaultTaskForDept = tasks.find(t => t.dept === selectedDept || t.dept === 'ALL');
+    const defaultTaskForDept = tasks.find(t => {
+      const taskDept = t.dept || (t.specialtyType === '내과계' ? '내과' : (t.specialtyType === '비내과계' ? '비내과' : 'ALL'));
+      return taskDept === selectedDept || taskDept === 'ALL' || t.specialtyType === '공통';
+    });
     if (defaultTaskForDept) {
       setSelectedTask(defaultTaskForDept.name);
     }
@@ -324,7 +329,7 @@ export const UserView: React.FC<UserViewProps> = ({
               >
                 {availableTasks.map(t => (
                   <option key={t.id} value={t.name}>
-                    [{t.category}] {t.name}
+                    [{t.category}] {t.name} {t.isNurseSupport === 'Y' || t.isNurseSupport === true ? '· 전담지원 가능' : ''}
                   </option>
                 ))}
               </select>

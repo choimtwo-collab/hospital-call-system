@@ -69,14 +69,20 @@ export interface EmergencyContact {
   category: 'ER' | 'OR' | 'ICU' | 'LAB' | 'ADMIN';
 }
 
-export type TaskCategory = '인턴 필수' | '공통 전담 지원' | '진료과 전담 전용' | '특수 예외';
+export type SpecialtyType = '내과계' | '비내과계' | '공통';
+export type TaskCategory = '검사' | '치료 및 처치' | '동의서' | '사망 및 기타';
+export type TimeRuleType = '정규/당직 분리형' | '시간대 무관 고정형' | '특정 시간 예외형';
 
 export interface TaskItem {
-  id: string;
-  name: string;
-  dept: '내과' | '비내과' | 'ALL';
-  category: TaskCategory;
-  description?: string;
+  id: string; // 업무 코드 (Task_Code, 예: TSK_EKG_P)
+  code?: string; // 업무 식별 고유 코드 (Task_Code)
+  name: string; // 업무명 (Task_Name)
+  specialtyType: SpecialtyType; // 진료계열 구분 (Specialty_Type: 내과계 / 비내과계 / 공통)
+  dept?: '내과' | '비내과' | 'ALL'; // 하위 호환 진료계열
+  category: TaskCategory; // 업무 분류 카테고리 (Category: 검사 / 치료 및 처치 / 동의서 / 사망 및 기타)
+  isNurseSupport: 'Y' | 'N' | boolean; // 전담간호사 지원 가능 여부 (Is_Nurse_Support: Y / N)
+  timeRuleType: TimeRuleType; // 시간대별 매칭 룰 (Time_Rule_Type: 정규/당직 분리형 / 시간대 무관 고정형 / 특정 시간 예외형)
+  description?: string; // 상세 설명 및 매칭 가이드 (Description)
 }
 
 export interface RuleCondition {
