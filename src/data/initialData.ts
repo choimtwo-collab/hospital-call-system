@@ -231,18 +231,73 @@ export const initialTasks: TaskItem[] = [
     description: `• 비위관(L-tube) 삽입 및 제거 업무입니다.
 • 공통 전담간호사가 담당합니다.`
   },
-  // ③ 기타 및 동의서/사망 카테고리
+  // ③ 동의서 카테고리 (Category: 동의서)
+  {
+    id: 'TSK_BLOOD_CONSENT',
+    code: 'TSK_BLOOD_CONSENT',
+    name: '수혈 동의서',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '동의서',
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '정규/당직 분리형',
+    description: `• 평일 정규 및 정규 외 상시: 인턴 담당 업무입니다 (공통 전담 지원 제외).
+• 내과계 야간/주말: 병동 Group 1 및 MICU는 내과계 당직인턴1 / 병동 Group 2는 내과계 당직인턴2 연결.
+• 비내과계 야간/주말: 당직인턴2 (Group C) 또는 당직인턴3 (Group D) 연결.`
+  },
   {
     id: 'TSK_AN_CONSENT',
     code: 'TSK_AN_CONSENT',
-    name: '일요일 AN 마취동의서',
+    name: '마취 동의서 (일요일 예외)',
     specialtyType: '비내과계',
     dept: '비내과',
     category: '동의서',
     isNurseSupport: 'N',
     nurseSupportNote: '지원 불가',
     timeRuleType: '특정 시간 예외형',
-    description: '일요일 비내과 1(5-4080) 고정'
+    description: `• 일요일에 발행되는 AN(마취통증의학과) 마취 동의서 취득 업무입니다.
+• 비내과 당직인턴1 (공용폰: 010-7628-5803)로 다이렉트 매칭됩니다.`
+  },
+  {
+    id: 'TSK_NURSE_CONSENT',
+    code: 'TSK_NURSE_CONSENT',
+    name: '병동 전담간호사 동의서 (CT/MRI 조영제 등)',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '동의서',
+    isNurseSupport: 'Y',
+    nurseSupportNote: '08:00~22:00',
+    timeRuleType: '정규/당직 분리형',
+    description: `• CT/MRI 조영제 사용 동의서, 중심정맥관 조영제 주입 동의서, MRI 진정 동의서 등.
+• 병동 전담간호사 업무 지원 시간대(08:00~22:00) 내에 해당 병동 담당 공통 전담간호사가 취득합니다.`
+  },
+  // ④ 사망 선언 및 기타 (Category: 사망 및 기타)
+  {
+    id: 'TSK_DEATH_IM',
+    code: 'TSK_DEATH_IM',
+    name: '내과계 사망 선언',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '정규/당직 분리형',
+    description: `• 야간 및 주말/공휴일에 내과 환자 사망선언 발생 시 호출 대상입니다.
+• 병동 Group 1 및 MICU는 내과 당직인턴1 / 병동 Group 2는 내과 당직인턴2 개인 UCAP로 다이렉트 매칭됩니다.`
+  },
+  {
+    id: 'TSK_DEATH_INT',
+    code: 'TSK_DEATH_INT',
+    name: '비내과계 사망 선언 (통합의학과)',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '시간대 무관 고정형',
+    description: `• 통합의학과 입원 환자의 사망선언 호출 업무입니다.
+• 비내과 당직인턴2 (공용폰: 010-7624-5803 / 내선 5-4081)로 매칭됩니다.`
   },
   {
     id: 'TSK_EMERG_OR',
@@ -250,35 +305,25 @@ export const initialTasks: TaskItem[] = [
     name: '응급수술 Assist',
     specialtyType: '비내과계',
     dept: '비내과',
-    category: '치료 및 처치',
-    isNurseSupport: 'N',
-    nurseSupportNote: '지원 불가',
-    timeRuleType: '시간대 무관 고정형',
-    description: '1순위 비내과 1(5-4080), 2순위 비내과 2(5-4081)'
-  },
-  {
-    id: 'TSK_DEATH_INT',
-    code: 'TSK_DEATH_INT',
-    name: '통합의학과 사망선언',
-    specialtyType: '비내과계',
-    dept: '비내과',
     category: '사망 및 기타',
     isNurseSupport: 'N',
     nurseSupportNote: '지원 불가',
     timeRuleType: '시간대 무관 고정형',
-    description: '비내과 당직인턴 2(5-4081) 고정 매칭'
+    description: `• 비내과계 응급 수술 지원 호출입니다.
+• 1순위 비내과 당직인턴1 (5-4080) 연결 후 연락 두절 시 2순위 비내과 당직인턴2 (5-4081)로 백업 흐름(Escalation)을 적용합니다.`
   },
   {
-    id: 'TSK_DEATH_IM',
-    code: 'TSK_DEATH_IM',
-    name: '내과계 사망선언',
-    specialtyType: '내과계',
-    dept: '내과',
+    id: 'TSK_EMERG_CPR',
+    code: 'TSK_EMERG_CPR',
+    name: '응급상황 CPR 및 응급약물 투여',
+    specialtyType: '공통',
+    dept: 'ALL',
     category: '사망 및 기타',
-    isNurseSupport: 'N',
-    nurseSupportNote: '지원 불가',
-    timeRuleType: '정규/당직 분리형',
-    description: '정규 해당과 인턴 / 야간 내과 당직인턴 1·2 담당'
+    isNurseSupport: 'Y',
+    nurseSupportNote: '동시 호출',
+    timeRuleType: '시간대 무관 고정형',
+    description: `• 병동 내 응급상황 발생 시 CPR 보조 및 응급약물 주입 업무입니다.
+• 공통 전담간호사와 당직 의료진이 동시에 자동 호출됩니다.`
   },
   {
     id: 'TSK_PRIM_CALL',

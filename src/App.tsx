@@ -22,7 +22,7 @@ const STORAGE_KEYS = {
   TIME_SLOTS: 'hcs_time_slots_v1',
   CN_POSTS: 'hcs_cn_posts_v1',
   WEEKLY_CN: 'hcs_weekly_cn_v1',
-  TASKS: 'hcs_tasks_v5',
+  TASKS: 'hcs_tasks_v6',
   CUSTOM_RULES: 'hcs_custom_rules_v1',
   INTERNS: 'hcs_interns_v1',
   PATHOLOGISTS: 'hcs_pathologists_v1',
@@ -67,7 +67,11 @@ export default function App() {
     try {
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return initialTasks;
-      if (parsed.some((t: any) => t.id === 'task-im-1' || !t.id?.startsWith('TSK_')) || !parsed.some((t: any) => t.id === 'TSK_SIMPLE_DRESS')) {
+      if (
+        parsed.some((t: any) => t.id === 'task-im-1' || !t.id?.startsWith('TSK_')) ||
+        !parsed.some((t: any) => t.id === 'TSK_BLOOD_CONSENT') ||
+        !parsed.some((t: any) => t.id === 'TSK_EMERG_CPR')
+      ) {
         return initialTasks;
       }
       return parsed;

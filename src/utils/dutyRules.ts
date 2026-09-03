@@ -161,7 +161,12 @@ export function evaluateDutyRules(
       return true;
     });
 
-    if (isTask('EKG')) {
+    // 응급상황 CPR 및 응급약물 투여 (진료과/시간대 무관 공통 동시 호출)
+    if (isTask('CPR') || isTask('응급약물') || isTask('응급상황')) {
+      assignedRole = '공통 전담간호사 & 당직의료진 (동시 호출)';
+      notes = '병동 내 응급상황: 공통 전담간호사와 당직 의료진이 동시에 자동 호출됩니다.';
+    }
+    else if (isTask('EKG')) {
       if (matchedPathologist) {
         assignedRole = ROLES.PATHOLOGIST;
         const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
@@ -190,6 +195,16 @@ export function evaluateDutyRules(
       else if (!isNightHours && (isTask('단순 드레싱') || isTask('복합 드레싱') || isTask('Catheter / Tube'))) {
         assignedRole = ROLES.COMMON_NURSE;
         notes = '공통 전담간호사가 기본 담당합니다 (22:00~08:00 야간 시간대 제외).';
+      }
+      // 3. 병동 전담간호사 동의서 (CT/MRI 조영제 등): 08:00~22:00 공통 전담간호사
+      else if (isTask('조영제') || isTask('진정 동의서') || isTask('전담간호사 동의서')) {
+        if (!isNightHours) {
+          assignedRole = ROLES.COMMON_NURSE;
+          notes = '병동 전담간호사 업무 지원 시간대(08:00~22:00) 내에 해당 병동 담당 공통 전담간호사가 취득합니다.';
+        } else {
+          assignedRole = ROLES.IM_1;
+          notes = '심야(22:00~08:00) 조영제/진정 동의서는 당직 의료진이 취득합니다.';
+        }
       }
       else if (isRegularHours) {
         // 평일 정규시간 (08:00 ~ 17:00)
