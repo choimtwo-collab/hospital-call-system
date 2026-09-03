@@ -4,10 +4,12 @@ import { UserView } from './components/UserView';
 import { AdminView } from './components/AdminView';
 import { 
   initialSchedules, initialContacts, initialTimeSlots, 
-  initialCNPosts, initialWeeklyCNSchedule 
+  initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
+  initialCustomRules, initialInterns, initialPathologistSchedules
 } from './data/initialData';
 import { 
-  DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap 
+  DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule 
 } from './types';
 
 const STORAGE_KEYS = {
@@ -15,7 +17,11 @@ const STORAGE_KEYS = {
   CONTACTS: 'hcs_contacts_v1',
   TIME_SLOTS: 'hcs_time_slots_v1',
   CN_POSTS: 'hcs_cn_posts_v1',
-  WEEKLY_CN: 'hcs_weekly_cn_v1'
+  WEEKLY_CN: 'hcs_weekly_cn_v1',
+  TASKS: 'hcs_tasks_v1',
+  CUSTOM_RULES: 'hcs_custom_rules_v1',
+  INTERNS: 'hcs_interns_v1',
+  PATHOLOGISTS: 'hcs_pathologists_v1'
 };
 
 export default function App() {
@@ -47,6 +53,26 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialWeeklyCNSchedule;
   });
 
+  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
+    return saved ? JSON.parse(saved) : initialTasks;
+  });
+
+  const [customRules, setCustomRules] = useState<CustomRule[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CUSTOM_RULES);
+    return saved ? JSON.parse(saved) : initialCustomRules;
+  });
+
+  const [interns, setInterns] = useState<InternDoctor[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.INTERNS);
+    return saved ? JSON.parse(saved) : initialInterns;
+  });
+
+  const [pathologistSchedules, setPathologistSchedules] = useState<PathologistSchedule[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PATHOLOGISTS);
+    return saved ? JSON.parse(saved) : initialPathologistSchedules;
+  });
+
   // Sync state to LocalStorage on change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(schedules));
@@ -68,18 +94,34 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.WEEKLY_CN, JSON.stringify(weeklyCNSchedule));
   }, [weeklyCNSchedule]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_RULES, JSON.stringify(customRules));
+  }, [customRules]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.INTERNS, JSON.stringify(interns));
+  }, [interns]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PATHOLOGISTS, JSON.stringify(pathologistSchedules));
+  }, [pathologistSchedules]);
+
   const handleResetData = () => {
-    localStorage.removeItem(STORAGE_KEYS.SCHEDULES);
-    localStorage.removeItem(STORAGE_KEYS.CONTACTS);
-    localStorage.removeItem(STORAGE_KEYS.TIME_SLOTS);
-    localStorage.removeItem(STORAGE_KEYS.CN_POSTS);
-    localStorage.removeItem(STORAGE_KEYS.WEEKLY_CN);
+    Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
 
     setSchedules(initialSchedules);
     setContacts(initialContacts);
     setTimeSlots(initialTimeSlots);
     setCnPosts(initialCNPosts);
     setWeeklyCNSchedule(initialWeeklyCNSchedule);
+    setTasks(initialTasks);
+    setCustomRules(initialCustomRules);
+    setInterns(initialInterns);
+    setPathologistSchedules(initialPathologistSchedules);
   };
 
   return (
@@ -97,6 +139,9 @@ export default function App() {
             timeSlots={timeSlots}
             cnPosts={cnPosts}
             weeklyCNSchedule={weeklyCNSchedule}
+            tasks={tasks}
+            customRules={customRules}
+            pathologistSchedules={pathologistSchedules}
           />
         ) : (
           <AdminView
@@ -110,6 +155,14 @@ export default function App() {
             setCnPosts={setCnPosts}
             weeklyCNSchedule={weeklyCNSchedule}
             setWeeklyCNSchedule={setWeeklyCNSchedule}
+            tasks={tasks}
+            setTasks={setTasks}
+            customRules={customRules}
+            setCustomRules={setCustomRules}
+            interns={interns}
+            setInterns={setInterns}
+            pathologistSchedules={pathologistSchedules}
+            setPathologistSchedules={setPathologistSchedules}
             onResetData={handleResetData}
           />
         )}

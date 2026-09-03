@@ -1,6 +1,7 @@
 export interface ContactInfo {
   phone: string;
   ucap: string;
+  dumcTalk?: string;
 }
 
 export type ContactMap = Record<string, ContactInfo>;
@@ -21,6 +22,7 @@ export interface CNPost {
   wards: string[];
   phone: string;
   ucap: string;
+  dumcTalk?: string;
 }
 
 // weeklyCNSchedule[dayOfWeek 0..6][timeSlotId][cnPostId] = nurseName
@@ -28,13 +30,18 @@ export type WeeklyCNScheduleMap = Record<number, Record<string, Record<string, s
 
 export interface SearchResult {
   isRegularHours: boolean;
+  isHolidayOrWeekend: boolean;
+  holidayName?: string;
   assignedRole: string;
   assignedPerson: string;
   contactInfo: ContactInfo;
   dutyPhone: string | null;
   dutyUcap: string | null;
   backupRole: string;
+  backupContact1?: ContactInfo & { roleName: string };
+  backupContact2?: ContactInfo & { roleName: string };
   notes: string;
+  ruleSource?: 'DYNAMIC_RULE' | 'SYSTEM_DEFAULT';
 }
 
 export interface EmergencyContact {
@@ -44,4 +51,57 @@ export interface EmergencyContact {
   ucap: string;
   phone: string;
   category: 'ER' | 'OR' | 'ICU' | 'LAB' | 'ADMIN';
+}
+
+export type TaskCategory = '인턴 필수' | '공통 전담 지원' | '진료과 전담 전용' | '특수 예외';
+
+export interface TaskItem {
+  id: string;
+  name: string;
+  dept: '내과' | '비내과' | 'ALL';
+  category: TaskCategory;
+  description?: string;
+}
+
+export interface RuleCondition {
+  department?: '내과' | '비내과' | 'ALL';
+  wardGroup?: 'GROUP_A' | 'GROUP_B' | 'GROUP_C' | 'GROUP_D' | 'ALL' | string;
+  specificWards?: string[];
+  taskKeywords?: string[];
+  timeCategory?: 'REGULAR' | 'NON_REGULAR' | 'NIGHT_22_08' | 'EVENING_17_22' | 'MORNING_06_08' | 'ALL';
+  dayCategory?: 'WEEKDAY' | 'WEEKEND_HOLIDAY' | 'SUNDAY_ONLY' | 'ALL';
+}
+
+export interface RuleAction {
+  assignedRole: string;
+  backupRole?: string;
+  dutyPhone?: string;
+  dutyUcap?: string;
+  notes?: string;
+}
+
+export interface CustomRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  condition: RuleCondition;
+  action: RuleAction;
+}
+
+export interface InternDoctor {
+  id: string;
+  name: string;
+  dept: string;
+  ucap: string;
+  phone: string;
+}
+
+export interface PathologistSchedule {
+  id: string;
+  startDate: string;
+  endDate: string;
+  name: string;
+  phone: string;
+  ucap: string;
 }
