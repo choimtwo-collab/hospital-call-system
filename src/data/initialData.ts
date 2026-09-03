@@ -125,61 +125,113 @@ export const initialTasks: TaskItem[] = [
     timeRuleType: '시간대 무관 고정형',
     description: `• 진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.`
   },
+  // ② 치료 및 처치 카테고리 (Category: 치료 및 처치)
   {
-    id: 'TSK_GEN_PROC',
-    code: 'TSK_GEN_PROC',
-    name: '그외 술기 및 동의서',
+    id: 'TSK_TTUBE',
+    code: 'TSK_TTUBE',
+    name: 'T-tube 교체 (기관절개관 교체)',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '정규/당직 분리형',
+    description: `• 평일 정규 및 정규 외 상시: 인턴 담당 업무입니다.
+• 내과계 야간/주말: MICU는 내과 당직인턴1 / 병동 Group 2는 내과 당직인턴2가 담당합니다 (일반병동 Group 1 야간 요청 시 내과 전공의 별도 콜 안내).
+• 비내과계 야간/주말: 당직인턴2 (Group C) 또는 당직인턴3 (Group D) 연결.`
+  },
+  {
+    id: 'TSK_SIMPLE_DRESS',
+    code: 'TSK_SIMPLE_DRESS',
+    name: '단순 드레싱',
     specialtyType: '공통',
     dept: 'ALL',
     category: '치료 및 처치',
     isNurseSupport: 'Y',
+    nurseSupportNote: '야간 제외',
     timeRuleType: '정규/당직 분리형',
-    description: '평일 주간 및 야간 공통 전담간호사 지원 (단순드레싱 등)'
+    description: `• 일반 드레싱, 시술 후 단순 드레싱, 상처 소독, 단순 욕창 소독 업무입니다.
+• 22:00~08:00 야간 시간대를 제외하고 공통 전담간호사가 기본 담당합니다.`
   },
   {
-    id: 'TSK_TTUBE',
-    code: 'TSK_TTUBE',
-    name: 'T-tube 교체',
+    id: 'TSK_COMPLEX_DRESS',
+    code: 'TSK_COMPLEX_DRESS',
+    name: '복합 드레싱 (Catheter / Tube)',
     specialtyType: '공통',
     dept: 'ALL',
     category: '치료 및 처치',
-    isNurseSupport: 'N',
+    isNurseSupport: 'Y',
+    nurseSupportNote: '야간 제외',
     timeRuleType: '정규/당직 분리형',
-    description: '정규 해당과 인턴 / 당직 시간 당직의 수행'
+    description: `• 각종 카테터 삽입 부위 및 튜브 주변부 소독, Tracheostomy tube 드레싱 포함.
+• 22:00~08:00 야간 시간대를 제외하고 공통 전담간호사가 기본 담당합니다.`
   },
   {
-    id: 'TSK_DEATH_INT',
-    code: 'TSK_DEATH_INT',
-    name: '통합의학과 사망선언',
+    id: 'TSK_SPECIAL_DRESS',
+    code: 'TSK_SPECIAL_DRESS',
+    name: '특수 드레싱 (통합의학과)',
     specialtyType: '비내과계',
     dept: '비내과',
-    category: '사망 및 기타',
+    category: '치료 및 처치',
     isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '특정 시간 예외형',
+    description: `• 주말 및 공휴일에 발생하는 통합의학과 3단계 이상 Sore(욕창) 드레싱 업무입니다.
+• 비내과 당직인턴1 (공용폰: 010-7628-5803)로 다이렉트 매칭됩니다.`
+  },
+  {
+    id: 'TSK_UR_OP_DRESS',
+    code: 'TSK_UR_OP_DRESS',
+    name: '수술 부위 드레싱 (UR Op site)',
+    specialtyType: '비내과계',
+    dept: '비내과',
+    category: '치료 및 처치',
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '특정 시간 예외형',
+    description: `• 일요일에 발생하는 UR(비뇨의학과) 수술 부위(Op site) 드레싱 업무입니다.
+• 비내과 당직인턴1 (공용폰: 010-7628-5803)로 다이렉트 매칭됩니다.`
+  },
+  {
+    id: 'TSK_FOLEY_NELATON',
+    code: 'TSK_FOLEY_NELATON',
+    name: '유치도뇨관(Foley) Nelaton 삽입 및 제거',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '치료 및 처치',
+    isNurseSupport: 'Y',
+    nurseSupportNote: '상시 지원',
     timeRuleType: '시간대 무관 고정형',
-    description: '비내과 당직인턴 2(5-4081) 고정 매칭'
+    description: `• 단순 도뇨 및 유치 도뇨관 삽입/제거 업무입니다.
+• 외과 환자의 Foley 및 CIC(간헐적 자가도뇨) 업무를 포함하여 공통 전담간호사가 상시 담당합니다.`
   },
   {
-    id: 'TSK_SORE_DRESS',
-    code: 'TSK_SORE_DRESS',
-    name: '주말/휴일 통합의학과 3단계 이상 sore 드레싱',
-    specialtyType: '비내과계',
-    dept: '비내과',
+    id: 'TSK_DRAIN_CATHETER',
+    code: 'TSK_DRAIN_CATHETER',
+    name: '배액관 및 카테터 관리',
+    specialtyType: '공통',
+    dept: 'ALL',
     category: '치료 및 처치',
-    isNurseSupport: 'N',
-    timeRuleType: '특정 시간 예외형',
-    description: '주말/공휴일 비내과 당직인턴 1(5-4080) 고정'
+    isNurseSupport: 'Y',
+    nurseSupportNote: '상시 지원',
+    timeRuleType: '시간대 무관 고정형',
+    description: `• 배액주머니 교체 및 복강/흉강 배액관 제거, CVC/PICC 제거, Chemoport needling.
+• 공통 전담간호사가 담당합니다.`
   },
   {
-    id: 'TSK_UR_DRESS',
-    code: 'TSK_UR_DRESS',
-    name: '일요일 UR Op site dressing',
-    specialtyType: '비내과계',
-    dept: '비내과',
+    id: 'TSK_LTUBE',
+    code: 'TSK_LTUBE',
+    name: 'L-tube 삽관 및 발관',
+    specialtyType: '공통',
+    dept: 'ALL',
     category: '치료 및 처치',
-    isNurseSupport: 'N',
-    timeRuleType: '특정 시간 예외형',
-    description: '일요일 비내과 1(5-4080) 고정'
+    isNurseSupport: 'Y',
+    nurseSupportNote: '상시 지원',
+    timeRuleType: '시간대 무관 고정형',
+    description: `• 비위관(L-tube) 삽입 및 제거 업무입니다.
+• 공통 전담간호사가 담당합니다.`
   },
+  // ③ 기타 및 동의서/사망 카테고리
   {
     id: 'TSK_AN_CONSENT',
     code: 'TSK_AN_CONSENT',
@@ -188,6 +240,7 @@ export const initialTasks: TaskItem[] = [
     dept: '비내과',
     category: '동의서',
     isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
     timeRuleType: '특정 시간 예외형',
     description: '일요일 비내과 1(5-4080) 고정'
   },
@@ -199,19 +252,21 @@ export const initialTasks: TaskItem[] = [
     dept: '비내과',
     category: '치료 및 처치',
     isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
     timeRuleType: '시간대 무관 고정형',
     description: '1순위 비내과 1(5-4080), 2순위 비내과 2(5-4081)'
   },
   {
-    id: 'TSK_PRIM_CALL',
-    code: 'TSK_PRIM_CALL',
-    name: 'Primary Call',
-    specialtyType: '내과계',
-    dept: '내과',
+    id: 'TSK_DEATH_INT',
+    code: 'TSK_DEATH_INT',
+    name: '통합의학과 사망선언',
+    specialtyType: '비내과계',
+    dept: '비내과',
     category: '사망 및 기타',
-    isNurseSupport: 'Y',
-    timeRuleType: '정규/당직 분리형',
-    description: '전담간호사 우선 배정 (병동 그룹 A)'
+    isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
+    timeRuleType: '시간대 무관 고정형',
+    description: '비내과 당직인턴 2(5-4081) 고정 매칭'
   },
   {
     id: 'TSK_DEATH_IM',
@@ -221,8 +276,21 @@ export const initialTasks: TaskItem[] = [
     dept: '내과',
     category: '사망 및 기타',
     isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
     timeRuleType: '정규/당직 분리형',
     description: '정규 해당과 인턴 / 야간 내과 당직인턴 1·2 담당'
+  },
+  {
+    id: 'TSK_PRIM_CALL',
+    code: 'TSK_PRIM_CALL',
+    name: 'Primary Call',
+    specialtyType: '내과계',
+    dept: '내과',
+    category: '사망 및 기타',
+    isNurseSupport: 'Y',
+    nurseSupportNote: '전담 우선',
+    timeRuleType: '정규/당직 분리형',
+    description: '전담간호사 우선 배정 (병동 그룹 A)'
   }
 ];
 

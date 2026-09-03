@@ -176,10 +176,20 @@ export function evaluateDutyRules(
     // 규칙 1: 내과계 (Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else if (selectedDept === '내과') {
-      // Peripheral vein 채혈: 상시 공통 전담간호사
-      if (isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초')) {
+      // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
+      if (
+        isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초') ||
+        isTask('Foley') || isTask('Nelaton') || isTask('도뇨') ||
+        isTask('배액관') || isTask('카테터 관리') || isTask('Chemoport') ||
+        isTask('L-tube') || isTask('비위관')
+      ) {
         assignedRole = ROLES.COMMON_NURSE;
         notes = '진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.';
+      }
+      // 2. 단순 드레싱, 복합 드레싱: 22:00~08:00 야간 제외하고 공통 전담간호사 기본 담당
+      else if (!isNightHours && (isTask('단순 드레싱') || isTask('복합 드레싱') || isTask('Catheter / Tube'))) {
+        assignedRole = ROLES.COMMON_NURSE;
+        notes = '공통 전담간호사가 기본 담당합니다 (22:00~08:00 야간 시간대 제외).';
       }
       else if (isRegularHours) {
         // 평일 정규시간 (08:00 ~ 17:00)
@@ -212,8 +222,16 @@ export function evaluateDutyRules(
           if (isTask('Primary Call')) {
             assignedRole = ROLES.DUTY_NURSE;
             notes = '병동 그룹 A의 Primary Call은 당직 전담간호사 담당입니다.';
-          } else if (isTask('EKG') || isTask('수혈동의서') || isTask('T-tube') || isTask('사망선언')) {
-            // EKG(P), 수혈동의서, T-tube 교체, 사망선언 -> 내과 당직인턴 1 (개인 UCAP 매칭)
+          } else if (isTask('T-tube') || isTask('기관절개관')) {
+            if (selectedWard === 'MICU') {
+              assignedRole = ROLES.IM_1;
+              notes = 'MICU T-tube 교체는 내과계 당직인턴 1 담당입니다.';
+            } else {
+              assignedRole = '내과 전공의 (별도 콜 안내)';
+              notes = '일반병동 Group 1 야간 요청 시 내과 전공의 별도 콜 안내 대상입니다.';
+            }
+          } else if (isTask('EKG') || isTask('수혈동의서') || isTask('사망선언')) {
+            // EKG(P), 수혈동의서, 사망선언 -> 내과 당직인턴 1 (개인 UCAP 매칭)
             assignedRole = ROLES.IM_1;
             notes = '내과 당직인턴 1 담당 (개인 UCAP로 직접 연결됩니다).';
           } else if (isTask('ABGA') || isTask('Blood culture') || isTask('채혈')) {
@@ -269,10 +287,20 @@ export function evaluateDutyRules(
     // 규칙 2: 비내과계 (Non-Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else {
-      // Peripheral vein 채혈: 상시 공통 전담간호사
-      if (isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초')) {
+      // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
+      if (
+        isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초') ||
+        isTask('Foley') || isTask('Nelaton') || isTask('도뇨') ||
+        isTask('배액관') || isTask('카테터 관리') || isTask('Chemoport') ||
+        isTask('L-tube') || isTask('비위관')
+      ) {
         assignedRole = ROLES.COMMON_NURSE;
         notes = '진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.';
+      }
+      // 2. 단순 드레싱, 복합 드레싱: 22:00~08:00 야간 제외하고 공통 전담간호사 기본 담당
+      else if (!isNightHours && (isTask('단순 드레싱') || isTask('복합 드레싱') || isTask('Catheter / Tube'))) {
+        assignedRole = ROLES.COMMON_NURSE;
+        notes = '공통 전담간호사가 기본 담당합니다 (22:00~08:00 야간 시간대 제외).';
       }
       // 비내과계 특수 및 공통 예외 업무
       else if (isTask('통합의학과 사망선언')) {
@@ -280,16 +308,16 @@ export function evaluateDutyRules(
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
         dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
         notes = '통합의학과 사망선언 -> 비내과 당직인턴 2(5-4081) 고정 매칭.';
-      } else if (isWeekendOrHoliday && isTask('3단계 이상 sore')) {
+      } else if (isWeekendOrHoliday && (isTask('3단계 이상 sore') || isTask('특수 드레싱') || isTask('통합의학과'))) {
         assignedRole = ROLES.NON_IM_1;
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_1];
         dutyUcap = DUTY_UCAPS[ROLES.NON_IM_1];
-        notes = '주말/휴일 통합의학과 3단계 이상 sore 드레싱 -> 비내과 당직인턴 1(5-4080) 고정.';
-      } else if (isSunday && isTask('UR Op site dressing')) {
+        notes = '주말/휴일 통합의학과 3단계 이상 sore(특수 드레싱) -> 비내과 당직인턴 1(5-4080) 고정.';
+      } else if (isSunday && (isTask('UR Op site') || isTask('수술 부위 드레싱') || isTask('UR'))) {
         assignedRole = ROLES.NON_IM_1;
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_1];
         dutyUcap = DUTY_UCAPS[ROLES.NON_IM_1];
-        notes = '일요일 UR Op site dressing -> 비내과 당직인턴 1(5-4080) 고정.';
+        notes = '일요일 UR Op site 수술 부위 드레싱 -> 비내과 당직인턴 1(5-4080) 고정.';
       } else if (isSunday && isTask('AN 마취동의서')) {
         assignedRole = ROLES.NON_IM_1;
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_1];
@@ -301,6 +329,9 @@ export function evaluateDutyRules(
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_1];
         dutyUcap = DUTY_UCAPS[ROLES.NON_IM_1];
         notes = '응급수술 Assist는 1순위 비내과 당직인턴 1, 2순위 비내과 2로 배정됩니다.';
+      } else if (isRegularHours && (isTask('T-tube') || isTask('기관절개관'))) {
+        assignedRole = ROLES.INTERN;
+        notes = '평일 정규시간 T-tube 교체는 해당 진료과 인턴 담당입니다.';
       } else if (isTask('그외 술기') || isTask('동의서')) {
         assignedRole = ROLES.COMMON_NURSE;
         notes = '비내과 일반 술기 및 동의서는 공통 전담간호사가 지원합니다.';
