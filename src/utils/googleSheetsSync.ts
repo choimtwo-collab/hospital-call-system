@@ -129,7 +129,7 @@ export async function fetchGoogleSheetSchedules(
     }
 
     // 헤더 행 분석
-    const headerRow = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const headerRow = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\s+/g, ''));
     let dateCol = -1;
     let im1Col = -1;
     let im2Col = -1;
@@ -138,12 +138,27 @@ export async function fetchGoogleSheetSchedules(
     let non3Col = -1;
 
     headerRow.forEach((h, idx) => {
-      if (h.includes('날짜') || h.includes('date') || h.includes('일자')) dateCol = idx;
-      else if (h.includes('내과1') || h.includes('im1') || h.includes('인턴1')) im1Col = idx;
-      else if (h.includes('내과2') || h.includes('im2') || h.includes('인턴2')) im2Col = idx;
-      else if (h.includes('비내과1') || h.includes('non1') || h.includes('당직인턴1')) non1Col = idx;
-      else if (h.includes('비내과2') || h.includes('non2') || h.includes('당직인턴2')) non2Col = idx;
-      else if (h.includes('비내과3') || h.includes('non3') || h.includes('당직인턴3')) non3Col = idx;
+      if (h.includes('날짜') || h.includes('date') || h.includes('일자')) {
+        dateCol = idx;
+      } else if (h.includes('비내과') || h.includes('non')) {
+        // 비내과를 반드시 내과보다 먼저 검사!
+        if (h.includes('1') || h.includes('당직인턴1')) non1Col = idx;
+        else if (h.includes('2') || h.includes('당직인턴2')) non2Col = idx;
+        else if (h.includes('3') || h.includes('당직인턴3')) non3Col = idx;
+      } else if (h.includes('내과') || h.includes('im')) {
+        if (h.includes('1') || h.includes('인턴1')) im1Col = idx;
+        else if (h.includes('2') || h.includes('인턴2')) im2Col = idx;
+      } else if (h.includes('당직인턴1') || h === '당직1') {
+        non1Col = idx;
+      } else if (h.includes('당직인턴2') || h === '당직2') {
+        non2Col = idx;
+      } else if (h.includes('당직인턴3') || h === '당직3') {
+        non3Col = idx;
+      } else if (h === '인턴1') {
+        im1Col = idx;
+      } else if (h === '인턴2') {
+        im2Col = idx;
+      }
     });
 
     if (dateCol === -1) dateCol = 0;
@@ -174,12 +189,28 @@ export async function fetchGoogleSheetSchedules(
 
       if (!formattedDate || formattedDate.length < 8) continue;
 
+      const im1Val = String(row[im1Col] || '').trim();
+      const im2Val = String(row[im2Col] || '').trim();
+      const non1Val = String(row[non1Col] || '').trim();
+      const non2Val = String(row[non2Col] || '').trim();
+      const non3Val = String(row[non3Col] || '').trim();
+
       newSchedules[formattedDate] = {
-        [ROLES.IM_1]: String(row[im1Col] || '').trim(),
-        [ROLES.IM_2]: String(row[im2Col] || '').trim(),
-        [ROLES.NON_IM_1]: String(row[non1Col] || '').trim(),
-        [ROLES.NON_IM_2]: String(row[non2Col] || '').trim(),
-        [ROLES.NON_IM_3]: String(row[non3Col] || '').trim()
+        [ROLES.IM_1]: im1Val,
+        '내과 1': im1Val,
+        '내과1': im1Val,
+        [ROLES.IM_2]: im2Val,
+        '내과 2': im2Val,
+        '내과2': im2Val,
+        [ROLES.NON_IM_1]: non1Val,
+        '비내과 1': non1Val,
+        '비내과1': non1Val,
+        [ROLES.NON_IM_2]: non2Val,
+        '비내과 2': non2Val,
+        '비내과2': non2Val,
+        [ROLES.NON_IM_3]: non3Val,
+        '비내과 3': non3Val,
+        '비내과3': non3Val
       };
       parsedDates.push(formattedDate);
     }

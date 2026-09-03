@@ -14,18 +14,42 @@ export function getScheduleDoctor(schedule: Record<string, string> | undefined, 
   if (!schedule) return '';
   if (schedule[roleKey]) return schedule[roleKey];
 
-  const cleanKey = roleKey.replace(/\s+/g, '');
+  const cleanKey = roleKey.replace(/\s+/g, '').toLowerCase();
+
+  // 1. Exact match after cleaning whitespace & lowercasing
   for (const [k, v] of Object.entries(schedule)) {
     if (!v) continue;
-    if (k === roleKey) return v;
-    const cleanK = k.replace(/\s+/g, '');
+    const cleanK = k.replace(/\s+/g, '').toLowerCase();
     if (cleanK === cleanKey) return v;
-    if (cleanKey.includes('내과1') && cleanK.includes('내과1')) return v;
-    if (cleanKey.includes('내과2') && cleanK.includes('내과2')) return v;
-    if (cleanKey.includes('비내과1') && cleanK.includes('비내과1')) return v;
-    if (cleanKey.includes('비내과2') && cleanK.includes('비내과2')) return v;
-    if (cleanKey.includes('비내과3') && cleanK.includes('비내과3')) return v;
   }
+
+  // 2. Distinguish 내과 from 비내과
+  const isNonIm = cleanKey.includes('비내과') || cleanKey.includes('non');
+  const isIm = !isNonIm && (cleanKey.includes('내과') || cleanKey.includes('im'));
+
+  for (const [k, v] of Object.entries(schedule)) {
+    if (!v) continue;
+    const cleanK = k.replace(/\s+/g, '').toLowerCase();
+    const kIsNonIm = cleanK.includes('비내과') || cleanK.includes('non');
+    const kIsIm = !kIsNonIm && (cleanK.includes('내과') || cleanK.includes('im'));
+
+    if (isIm && kIsIm) {
+      if ((cleanKey.includes('1') || cleanKey.includes('인턴1')) && (cleanK.includes('1') || cleanK.includes('인턴1'))) return v;
+      if ((cleanKey.includes('2') || cleanKey.includes('인턴2')) && (cleanK.includes('2') || cleanK.includes('인턴2'))) return v;
+    }
+
+    if (isNonIm && kIsNonIm) {
+      if ((cleanKey.includes('1') || cleanKey.includes('당직인턴1')) && (cleanK.includes('1') || cleanK.includes('당직인턴1'))) return v;
+      if ((cleanKey.includes('2') || cleanKey.includes('당직인턴2')) && (cleanK.includes('2') || cleanK.includes('당직인턴2'))) return v;
+      if ((cleanKey.includes('3') || cleanKey.includes('당직인턴3')) && (cleanK.includes('3') || cleanK.includes('당직인턴3'))) return v;
+    }
+
+    if ((cleanKey.includes('연차') || cleanKey.includes('휴가') || cleanKey.includes('off')) &&
+        (cleanK.includes('연차') || cleanK.includes('휴가') || cleanK.includes('off'))) {
+      return v;
+    }
+  }
+
   return '';
 }
 

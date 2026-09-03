@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  CalendarIcon, Clock, Phone, User, Search, Settings, ShieldAlert, Activity, 
+import {
+  CalendarIcon, Clock, Phone, User, Search, Settings, ShieldAlert, Activity,
   PhoneCall, CheckCircle2, Plus, Trash2, Edit3, Grid, List, Users
 } from 'lucide-react';
 
@@ -33,16 +33,16 @@ const ALL_WARDS = Array.from(new Set([...WARD_OPTIONS['내과'], ...WARD_OPTIONS
 
 const TASK_OPTIONS = {
   '내과': [
-    '1. EKG(P), 수혈동의서, T-tube 교체, 사망선언', 
-    '2. ABGA/Line 통한 채혈 및 Blood culture', 
-    '3. 그외 술기 및 동의서', 
+    '1. EKG(P), 수혈동의서, T-tube 교체, 사망선언',
+    '2. ABGA/Line 통한 채혈 및 Blood culture',
+    '3. 그외 술기 및 동의서',
     '4. Primary Call'
   ],
   '비내과': [
-    '1. EKG(P), 수혈동의서, T-tube 교체', 
-    '2. ABGA/Line 통한 채혈 및 Blood culture', 
-    '3. 통합의학과 사망선언', 
-    '4. 주말 및 휴일_통합의학과 및 3단계 이상 sore Dx, 일요일_UR Op wx, Dressing, AN 마취동의서', 
+    '1. EKG(P), 수혈동의서, T-tube 교체',
+    '2. ABGA/Line 통한 채혈 및 Blood culture',
+    '3. 통합의학과 사망선언',
+    '4. 주말 및 휴일_통합의학과 및 3단계 이상 sore Dx, 일요일_UR Op wx, Dressing, AN 마취동의서',
     '5. 그외 술기 및 동의서'
   ]
 };
@@ -71,7 +71,7 @@ const initialSchedules = {
 const initialTimeSlots = [
   { id: 'ts_day', name: 'Day', start: '06:30', end: '14:30' },
   { id: 'ts_eve', name: 'Evening', start: '14:30', end: '22:00' },
-  { id: 'ts_night', name: 'Night', start: '22:00', end: '06:30' } 
+  { id: 'ts_night', name: 'Night', start: '22:00', end: '06:30' }
 ];
 
 const initialCNPosts = Array.from({ length: 10 }, (_, i) => ({
@@ -79,11 +79,11 @@ const initialCNPosts = Array.from({ length: 10 }, (_, i) => ({
   name: `공통전담${i + 1}`,
   wards: i === 0 ? ['61병동', '62병동'] : (i === 1 ? ['71병동', '72병동'] : []), // 기본 예시 매핑
   phone: `010-1000-200${i}`,
-  ucap: `530${i < 10 ? '0'+i : i}`
+  ucap: `530${i < 10 ? '0' + i : i}`
 }));
 
 const initialWeeklyCNSchedule = {};
-for(let i=0; i<7; i++) {
+for (let i = 0; i < 7; i++) {
   initialWeeklyCNSchedule[i] = {
     'ts_day': { 'CN1': '김데이', 'CN2': '박데이' },
     'ts_eve': { 'CN1': '이이브', 'CN2': '최이브' },
@@ -97,12 +97,12 @@ const getLocalISOString = () => {
 };
 const todayDateStr = getLocalISOString().split('T')[0];
 if (!initialSchedules[todayDateStr]) {
-    initialSchedules[todayDateStr] = initialSchedules['2026-09-03']; 
+  initialSchedules[todayDateStr] = initialSchedules['2026-09-03'];
 }
 
 export default function HospitalCallRouter() {
-  const [view, setView] = useState('user'); 
-  const [adminTab, setAdminTab] = useState('schedules'); 
+  const [view, setView] = useState('user');
+  const [adminTab, setAdminTab] = useState('schedules');
   const [adminCNSubTab, setAdminCNSubTab] = useState('timeslot');
 
   // Main Data States
@@ -116,11 +116,11 @@ export default function HospitalCallRouter() {
   const [selectedDept, setSelectedDept] = useState('내과');
   const [selectedWard, setSelectedWard] = useState('61병동');
   const [selectedTask, setSelectedTask] = useState(TASK_OPTIONS['내과'][0]);
-  const [selectedDate, setSelectedDate] = useState(todayDateStr); 
+  const [selectedDate, setSelectedDate] = useState(todayDateStr);
   const [selectedTime, setSelectedTime] = useState(getLocalISOString().split('T')[1].substring(0, 5));
-  
+
   const [searchResult, setSearchResult] = useState(null);
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(1); 
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(1);
 
   useEffect(() => {
     setSelectedWard(WARD_OPTIONS[selectedDept][0]);
@@ -135,10 +135,10 @@ export default function HospitalCallRouter() {
 
   const evaluateRules = () => {
     const dateObj = new Date(selectedDate);
-    let dayOfWeek = dateObj.getDay(); 
+    let dayOfWeek = dateObj.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const hour = parseInt(selectedTime.split(':')[0], 10);
-    
+
     let isRegularHours = !isWeekend && (hour >= 8 && hour < 17);
     let assignedRole = null;
     let backupRole = '';
@@ -148,53 +148,53 @@ export default function HospitalCallRouter() {
 
     // Rule 0: Pathologist Exceptions
     if (!isWeekend && hour >= 6 && hour < 8 && isTask('EKG(P)')) {
-        assignedRole = ROLES.PATHOLOGIST;
-        notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
-    } 
+      assignedRole = ROLES.PATHOLOGIST;
+      notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+    }
     // Rule 1: Internal Medicine (내과)
     else if (selectedDept === '내과') {
-        if (isRegularHours) {
-            if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
-            else assignedRole = ROLES.INTERN;
+      if (isRegularHours) {
+        if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
+        else assignedRole = ROLES.INTERN;
+      } else {
+        const isNight = (hour >= 22 || hour < 8);
+        if (selectedWard === 'MICU') {
+          if (isTask('그외 술기')) assignedRole = isNight ? ROLES.IM_2 : ROLES.COMMON_NURSE;
+          else assignedRole = ROLES.IM_1;
+        } else if (['71', '72', '81', '101', '111', '112'].some(w => selectedWard.includes(w))) {
+          if (isTask('그외 술기')) assignedRole = isNight ? ROLES.IM_2 : ROLES.COMMON_NURSE;
+          else assignedRole = ROLES.IM_2;
         } else {
-            const isNight = (hour >= 22 || hour < 8);
-            if (selectedWard === 'MICU') {
-                if (isTask('그외 술기')) assignedRole = isNight ? ROLES.IM_2 : ROLES.COMMON_NURSE;
-                else assignedRole = ROLES.IM_1;
-            } else if (['71', '72', '81', '101', '111', '112'].some(w => selectedWard.includes(w))) {
-                if (isTask('그외 술기')) assignedRole = isNight ? ROLES.IM_2 : ROLES.COMMON_NURSE;
-                else assignedRole = ROLES.IM_2;
-            } else { 
-                if (isTask('Primary Call') || isTask('ABGA')) assignedRole = ROLES.DUTY_NURSE;
-                else if (isTask('EKG') || isTask('사망선언')) assignedRole = ROLES.IM_1;
-                else if (isTask('그외 술기')) assignedRole = isNight ? ROLES.DUTY_NURSE : ROLES.COMMON_NURSE;
-            }
+          if (isTask('Primary Call') || isTask('ABGA')) assignedRole = ROLES.DUTY_NURSE;
+          else if (isTask('EKG') || isTask('사망선언')) assignedRole = ROLES.IM_1;
+          else if (isTask('그외 술기')) assignedRole = isNight ? ROLES.DUTY_NURSE : ROLES.COMMON_NURSE;
         }
-    } 
+      }
+    }
     // Rule 2: Non-Internal Medicine (비내과)
     else {
-        const isGroup1 = ['SICU', '분만장', '42', '61', '62', 'NICU'].some(w => selectedWard.includes(w));
-        if (isRegularHours) {
-             if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
-             else if (isTask('사망선언') || isTask('주말')) assignedRole = ROLES.NON_IM_1; 
-             else {
-                  assignedRole = isGroup1 ? ROLES.NON_IM_2 : ROLES.NON_IM_3;
-                  backupRole = isGroup1 ? 'Back up: 1st 당직인턴1, 2nd 당직인턴3' : 'Back up: 당직인턴1';
-             }
-        } else {
-            if (isTask('사망선언')) assignedRole = ROLES.NON_IM_2;
-            else if (isTask('주말 및 휴일')) assignedRole = ROLES.NON_IM_1;
-            else if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
-            else { 
-                if (isGroup1) {
-                    assignedRole = ROLES.NON_IM_2;
-                    backupRole = 'Back up: 1st 비내과1, 2nd 비내과3';
-                } else {
-                    assignedRole = ROLES.NON_IM_3;
-                    backupRole = 'Back up: 비내과1 우선 call';
-                }
-            }
+      const isGroup1 = ['SICU', '분만장', '42', '61', '62', 'NICU'].some(w => selectedWard.includes(w));
+      if (isRegularHours) {
+        if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
+        else if (isTask('사망선언') || isTask('주말')) assignedRole = ROLES.NON_IM_1;
+        else {
+          assignedRole = isGroup1 ? ROLES.NON_IM_2 : ROLES.NON_IM_3;
+          backupRole = isGroup1 ? 'Back up: 1st 당직인턴1, 2nd 당직인턴3' : 'Back up: 당직인턴1';
         }
+      } else {
+        if (isTask('사망선언')) assignedRole = ROLES.NON_IM_2;
+        else if (isTask('주말 및 휴일')) assignedRole = ROLES.NON_IM_1;
+        else if (isTask('그외 술기')) assignedRole = ROLES.COMMON_NURSE;
+        else {
+          if (isGroup1) {
+            assignedRole = ROLES.NON_IM_2;
+            backupRole = 'Back up: 1st 비내과1, 2nd 비내과3';
+          } else {
+            assignedRole = ROLES.NON_IM_3;
+            backupRole = 'Back up: 비내과1 우선 call';
+          }
+        }
+      }
     }
 
     let assignedPerson = '미배정(표 확인)';
@@ -205,7 +205,7 @@ export default function HospitalCallRouter() {
     if (assignedRole === ROLES.COMMON_NURSE) {
       // 1. 선택된 병동을 담당하는 공통전담 포스트(CN1~10) 찾기
       const targetCN = cnPosts.find(cn => cn.wards.includes(selectedWard));
-      
+
       // 2. 선택된 시간대에 해당하는 커스텀 타임슬롯 찾기
       let targetTimeSlot = null;
       let shiftDate = new Date(selectedDate);
@@ -220,7 +220,7 @@ export default function HospitalCallRouter() {
           if (selectedTime >= s || selectedTime < e) {
             targetTimeSlot = slot;
             if (selectedTime < e) {
-               shiftDate.setDate(shiftDate.getDate() - 1); // 새벽 시간은 전날 근무표 기준
+              shiftDate.setDate(shiftDate.getDate() - 1); // 새벽 시간은 전날 근무표 기준
             }
           }
         }
@@ -241,25 +241,25 @@ export default function HospitalCallRouter() {
         assignedPerson = '당직표 확인 요망';
         notes = '해당 시간대나 병동에 관리자가 배정한 공통전담간호사 정보가 없습니다.';
       }
-    } 
+    }
     else if (assignedRole) {
-        // 인턴 및 기타 역할 해결
-        const todaysSchedule = schedules[selectedDate];
-        if (todaysSchedule && todaysSchedule[assignedRole]) {
-            assignedPerson = todaysSchedule[assignedRole];
-        }
-        if ([ROLES.DUTY_NURSE, ROLES.PATHOLOGIST, ROLES.INTERN].includes(assignedRole)) {
-            assignedPerson = assignedRole;
-        }
-        contactInfo = contacts[assignedPerson] || contactInfo;
-        if (DUTY_PHONES[assignedRole]) {
-            dutyPhone = DUTY_PHONES[assignedRole];
-            dutyUcap = DUTY_UCAPS[assignedRole];
-        }
+      // 인턴 및 기타 역할 해결
+      const todaysSchedule = schedules[selectedDate];
+      if (todaysSchedule && todaysSchedule[assignedRole]) {
+        assignedPerson = todaysSchedule[assignedRole];
+      }
+      if ([ROLES.DUTY_NURSE, ROLES.PATHOLOGIST, ROLES.INTERN].includes(assignedRole)) {
+        assignedPerson = assignedRole;
+      }
+      contactInfo = contacts[assignedPerson] || contactInfo;
+      if (DUTY_PHONES[assignedRole]) {
+        dutyPhone = DUTY_PHONES[assignedRole];
+        dutyUcap = DUTY_UCAPS[assignedRole];
+      }
     }
 
     setSearchResult({
-        isRegularHours, assignedRole, assignedPerson, contactInfo, dutyPhone, dutyUcap, backupRole, notes
+      isRegularHours, assignedRole, assignedPerson, contactInfo, dutyPhone, dutyUcap, backupRole, notes
     });
   };
 
@@ -281,7 +281,7 @@ export default function HospitalCallRouter() {
   const removeTimeSlot = (id) => {
     setTimeSlots(timeSlots.filter(slot => slot.id !== id));
   };
-  
+
   const toggleWardForCN = (cnId, ward) => {
     setCnPosts(posts => posts.map(post => {
       if (post.id === cnId) {
@@ -324,7 +324,7 @@ export default function HospitalCallRouter() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        
+
         {view === 'user' && (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="w-full lg:w-1/3 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">
@@ -354,7 +354,7 @@ export default function HospitalCallRouter() {
                   <input type="date" className="w-full p-3 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-sm" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
                 </div>
                 <div>
-                   <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex justify-between items-center mb-1.5">
                     <label className="text-xs font-bold text-slate-500 flex items-center"><Clock className="w-3.5 h-3.5 mr-1" /> 시간</label>
                     <button onClick={setToCurrentTime} className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">현재</button>
                   </div>
@@ -408,167 +408,167 @@ export default function HospitalCallRouter() {
           </div>
         )}
 
-        {}
+        { }
         {view === 'admin' && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 lg:p-6">
-             <div className="flex items-center gap-2 mb-6 pb-4 border-b">
-                <Settings className="w-5 h-5 text-slate-700" />
-                <h2 className="text-lg font-bold text-slate-900">시스템 관리</h2>
-             </div>
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b">
+              <Settings className="w-5 h-5 text-slate-700" />
+              <h2 className="text-lg font-bold text-slate-900">시스템 관리</h2>
+            </div>
 
-             <div className="flex gap-2 mb-6 overflow-x-auto pb-2 border-b border-slate-100">
-               <button onClick={() => setAdminTab('schedules')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'schedules' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'}`}>인턴 당직표</button>
-               <button onClick={() => setAdminTab('contacts')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'contacts' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'}`}>연락망 관리</button>
-               <button onClick={() => setAdminTab('common_nurse')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg flex items-center gap-1 ${adminTab === 'common_nurse' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-700'}`}>
-                 <Users className="w-4 h-4"/> 공통전담간호 관리
-               </button>
-             </div>
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 border-b border-slate-100">
+              <button onClick={() => setAdminTab('schedules')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'schedules' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'}`}>인턴 당직표</button>
+              <button onClick={() => setAdminTab('contacts')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg ${adminTab === 'contacts' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'}`}>연락망 관리</button>
+              <button onClick={() => setAdminTab('common_nurse')} className={`whitespace-nowrap px-4 py-2 font-bold text-sm rounded-lg flex items-center gap-1 ${adminTab === 'common_nurse' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-700'}`}>
+                <Users className="w-4 h-4" /> 공통전담간호 관리
+              </button>
+            </div>
 
-             {adminTab === 'schedules' && (
-               <div className="overflow-x-auto">
-                 <table className="w-full text-sm text-left border-collapse min-w-[600px]">
-                   <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                     <tr><th className="p-3">날짜</th><th className="p-3">내과1</th><th className="p-3">내과2</th><th className="p-3">비내과1</th><th className="p-3">비내과2</th><th className="p-3">비내과3</th></tr>
-                   </thead>
-                   <tbody>
-                     {Object.entries(schedules).map(([date, roles]) => (
-                       <tr key={date} className="border-b border-slate-100 hover:bg-slate-50">
-                         <td className="p-3 font-semibold text-slate-900">{date}</td>
-                         {[ROLES.IM_1, ROLES.IM_2, ROLES.NON_IM_1, ROLES.NON_IM_2, ROLES.NON_IM_3].map(role => (
-                            <td key={role} className="p-2"><input type="text" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center font-medium" value={roles[role] || ''} onChange={(e) => handleScheduleChange(date, role, e.target.value)} /></td>
-                         ))}
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
-             )}
+            {adminTab === 'schedules' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse min-w-[600px]">
+                  <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                    <tr><th className="p-3">날짜</th><th className="p-3">내과1</th><th className="p-3">내과2</th><th className="p-3">비내과1</th><th className="p-3">비내과2</th><th className="p-3">비내과3</th></tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(schedules).map(([date, roles]) => (
+                      <tr key={date} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-900">{date}</td>
+                        {[ROLES.IM_1, ROLES.IM_2, ROLES.NON_IM_1, ROLES.NON_IM_2, ROLES.NON_IM_3].map(role => (
+                          <td key={role} className="p-2"><input type="text" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center font-medium" value={roles[role] || ''} onChange={(e) => handleScheduleChange(date, role, e.target.value)} /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-             {adminTab === 'contacts' && (
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(contacts).filter(([name]) => !['공통전담간호사', '당직 전담간호사', '임상병리사', '해당과 인턴'].includes(name)).map(([name, info]) => (
-                    <div key={name} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
-                      <h4 className="font-bold text-slate-800 mb-3">{name}</h4>
-                      <div className="space-y-2 text-sm">
-                         <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"><span className="text-slate-500 font-bold">UCAP</span><span className="font-black text-blue-600">{info.ucap}</span></div>
-                         <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"><span className="text-slate-500 font-bold">Phone</span><span className="font-bold text-slate-700">{info.phone}</span></div>
-                      </div>
+            {adminTab === 'contacts' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(contacts).filter(([name]) => !['공통전담간호사', '당직 전담간호사', '임상병리사', '해당과 인턴'].includes(name)).map(([name, info]) => (
+                  <div key={name} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                    <h4 className="font-bold text-slate-800 mb-3">{name}</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"><span className="text-slate-500 font-bold">UCAP</span><span className="font-black text-blue-600">{info.ucap}</span></div>
+                      <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-100"><span className="text-slate-500 font-bold">Phone</span><span className="font-bold text-slate-700">{info.phone}</span></div>
                     </div>
-                  ))}
-               </div>
-             )}
+                  </div>
+                ))}
+              </div>
+            )}
 
-             {}
-             {adminTab === 'common_nurse' && (
-               <div className="space-y-6">
-                 {/* CN Sub Navigation */}
-                 <div className="flex bg-slate-100 p-1 rounded-lg w-fit mb-4">
-                   <button onClick={() => setAdminCNSubTab('timeslot')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'timeslot' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>시간대 설정</button>
-                   <button onClick={() => setAdminCNSubTab('wards')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'wards' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>담당 병동 관리</button>
-                   <button onClick={() => setAdminCNSubTab('schedule')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'schedule' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>주간 근무표 설정</button>
-                 </div>
+            { }
+            {adminTab === 'common_nurse' && (
+              <div className="space-y-6">
+                {/* CN Sub Navigation */}
+                <div className="flex bg-slate-100 p-1 rounded-lg w-fit mb-4">
+                  <button onClick={() => setAdminCNSubTab('timeslot')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'timeslot' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>시간대 설정</button>
+                  <button onClick={() => setAdminCNSubTab('wards')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'wards' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>담당 병동 관리</button>
+                  <button onClick={() => setAdminCNSubTab('schedule')} className={`px-4 py-2 text-sm font-bold rounded-md transition-shadow ${adminCNSubTab === 'schedule' ? 'bg-white text-blue-700 shadow' : 'text-slate-600'}`}>주간 근무표 설정</button>
+                </div>
 
-                 {/* 1. Time Slot Management */}
-                 {adminCNSubTab === 'timeslot' && (
-                   <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                     <div className="flex justify-between items-center mb-4">
-                       <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock className="w-4 h-4"/> 근무 시간대 커스텀</h3>
-                       <button onClick={addTimeSlot} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-700"><Plus className="w-4 h-4"/> 추가</button>
-                     </div>
-                     <div className="space-y-3">
-                       {timeSlots.map(slot => (
-                         <div key={slot.id} className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
-                           <input type="text" value={slot.name} onChange={(e) => updateTimeSlot(slot.id, 'name', e.target.value)} className="font-bold p-2 border border-slate-200 rounded w-32 outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: Day"/>
-                           <input type="time" value={slot.start} onChange={(e) => updateTimeSlot(slot.id, 'start', e.target.value)} className="p-2 border border-slate-200 rounded w-32 outline-none"/>
-                           <span className="font-bold text-slate-400">~</span>
-                           <input type="time" value={slot.end} onChange={(e) => updateTimeSlot(slot.id, 'end', e.target.value)} className="p-2 border border-slate-200 rounded w-32 outline-none"/>
-                           <button onClick={() => removeTimeSlot(slot.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg ml-auto"><Trash2 className="w-5 h-5"/></button>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                 )}
+                {/* 1. Time Slot Management */}
+                {adminCNSubTab === 'timeslot' && (
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock className="w-4 h-4" /> 근무 시간대 커스텀</h3>
+                      <button onClick={addTimeSlot} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-700"><Plus className="w-4 h-4" /> 추가</button>
+                    </div>
+                    <div className="space-y-3">
+                      {timeSlots.map(slot => (
+                        <div key={slot.id} className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
+                          <input type="text" value={slot.name} onChange={(e) => updateTimeSlot(slot.id, 'name', e.target.value)} className="font-bold p-2 border border-slate-200 rounded w-32 outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: Day" />
+                          <input type="time" value={slot.start} onChange={(e) => updateTimeSlot(slot.id, 'start', e.target.value)} className="p-2 border border-slate-200 rounded w-32 outline-none" />
+                          <span className="font-bold text-slate-400">~</span>
+                          <input type="time" value={slot.end} onChange={(e) => updateTimeSlot(slot.id, 'end', e.target.value)} className="p-2 border border-slate-200 rounded w-32 outline-none" />
+                          <button onClick={() => removeTimeSlot(slot.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg ml-auto"><Trash2 className="w-5 h-5" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                 {/* 2. Ward Assignment */}
-                 {adminCNSubTab === 'wards' && (
-                   <div className="space-y-4">
-                     {cnPosts.map(post => (
-                       <div key={post.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-6 lg:items-start">
-                         <div className="w-full lg:w-64 flex-shrink-0">
-                           <h4 className="font-bold text-lg text-blue-700 mb-3">{post.name}</h4>
-                           <div className="space-y-2 text-sm">
-                             <div>
-                               <label className="text-xs font-bold text-slate-500">전용 UCAP</label>
-                               <input type="text" value={post.ucap} onChange={e => updateCNContact(post.id, 'ucap', e.target.value)} className="w-full p-2 border border-slate-200 rounded mt-1 font-bold text-blue-600 bg-slate-50 outline-none"/>
-                             </div>
-                             <div>
-                               <label className="text-xs font-bold text-slate-500">전용 연락처</label>
-                               <input type="text" value={post.phone} onChange={e => updateCNContact(post.id, 'phone', e.target.value)} className="w-full p-2 border border-slate-200 rounded mt-1 font-bold bg-slate-50 outline-none"/>
-                             </div>
-                           </div>
-                         </div>
-                         <div className="flex-grow border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6">
-                           <label className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Grid className="w-4 h-4"/> 담당 병동 지정 (다중선택 가능)</label>
-                           <div className="flex flex-wrap gap-2">
-                             {ALL_WARDS.map(ward => {
-                               const isSelected = post.wards.includes(ward);
-                               return (
-                                 <button key={ward} onClick={() => toggleWardForCN(post.id, ward)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
-                                   {ward}
-                                 </button>
-                               )
-                             })}
-                           </div>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 )}
+                {/* 2. Ward Assignment */}
+                {adminCNSubTab === 'wards' && (
+                  <div className="space-y-4">
+                    {cnPosts.map(post => (
+                      <div key={post.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-6 lg:items-start">
+                        <div className="w-full lg:w-64 flex-shrink-0">
+                          <h4 className="font-bold text-lg text-blue-700 mb-3">{post.name}</h4>
+                          <div className="space-y-2 text-sm">
+                            <div>
+                              <label className="text-xs font-bold text-slate-500">전용 UCAP</label>
+                              <input type="text" value={post.ucap} onChange={e => updateCNContact(post.id, 'ucap', e.target.value)} className="w-full p-2 border border-slate-200 rounded mt-1 font-bold text-blue-600 bg-slate-50 outline-none" />
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-slate-500">전용 연락처</label>
+                              <input type="text" value={post.phone} onChange={e => updateCNContact(post.id, 'phone', e.target.value)} className="w-full p-2 border border-slate-200 rounded mt-1 font-bold bg-slate-50 outline-none" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-grow border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6">
+                          <label className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Grid className="w-4 h-4" /> 담당 병동 지정 (다중선택 가능)</label>
+                          <div className="flex flex-wrap gap-2">
+                            {ALL_WARDS.map(ward => {
+                              const isSelected = post.wards.includes(ward);
+                              return (
+                                <button key={ward} onClick={() => toggleWardForCN(post.id, ward)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors border ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
+                                  {ward}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                 {/* 3. Weekly Schedule */}
-                 {adminCNSubTab === 'schedule' && (
-                   <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                     <div className="flex flex-wrap gap-2 mb-6">
-                       {DAYS_OF_WEEK.map((day, idx) => (
-                         <button key={idx} onClick={() => setSelectedDayOfWeek(idx)} className={`px-4 py-2 rounded-lg font-bold text-sm ${selectedDayOfWeek === idx ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                           {day}
-                         </button>
-                       ))}
-                     </div>
-                     <div className="overflow-x-auto">
-                       <table className="w-full text-sm text-left border-collapse min-w-[600px]">
-                         <thead className="bg-blue-50 text-blue-800 font-bold border-b-2 border-blue-200">
-                           <tr>
-                             <th className="p-3">포스트 (Post)</th>
-                             {timeSlots.map(slot => (
-                               <th key={slot.id} className="p-3 text-center">{slot.name} <br/><span className="text-xs font-normal text-blue-600">{slot.start}~{slot.end}</span></th>
-                             ))}
-                           </tr>
-                         </thead>
-                         <tbody>
-                           {cnPosts.map(post => (
-                             <tr key={post.id} className="border-b border-slate-100 hover:bg-slate-50">
-                               <td className="p-3 font-bold text-slate-700">{post.name}</td>
-                               {timeSlots.map(slot => (
-                                 <td key={slot.id} className="p-2">
-                                   <input 
-                                     type="text" 
-                                     placeholder="근무자명"
-                                     value={weeklyCNSchedule[selectedDayOfWeek]?.[slot.id]?.[post.id] || ''}
-                                     onChange={(e) => handleCNScheduleChange(selectedDayOfWeek, slot.id, post.id, e.target.value)}
-                                     className="w-full p-2 border border-slate-300 rounded text-center focus:ring-2 focus:ring-blue-500 outline-none"
-                                   />
-                                 </td>
-                               ))}
-                             </tr>
-                           ))}
-                         </tbody>
-                       </table>
-                     </div>
-                   </div>
-                 )}
-               </div>
-             )}
+                {/* 3. Weekly Schedule */}
+                {adminCNSubTab === 'schedule' && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {DAYS_OF_WEEK.map((day, idx) => (
+                        <button key={idx} onClick={() => setSelectedDayOfWeek(idx)} className={`px-4 py-2 rounded-lg font-bold text-sm ${selectedDayOfWeek === idx ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left border-collapse min-w-[600px]">
+                        <thead className="bg-blue-50 text-blue-800 font-bold border-b-2 border-blue-200">
+                          <tr>
+                            <th className="p-3">포스트 (Post)</th>
+                            {timeSlots.map(slot => (
+                              <th key={slot.id} className="p-3 text-center">{slot.name} <br /><span className="text-xs font-normal text-blue-600">{slot.start}~{slot.end}</span></th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cnPosts.map(post => (
+                            <tr key={post.id} className="border-b border-slate-100 hover:bg-slate-50">
+                              <td className="p-3 font-bold text-slate-700">{post.name}</td>
+                              {timeSlots.map(slot => (
+                                <td key={slot.id} className="p-2">
+                                  <input
+                                    type="text"
+                                    placeholder="근무자명"
+                                    value={weeklyCNSchedule[selectedDayOfWeek]?.[slot.id]?.[post.id] || ''}
+                                    onChange={(e) => handleCNScheduleChange(selectedDayOfWeek, slot.id, post.id, e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded text-center focus:ring-2 focus:ring-blue-500 outline-none"
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>

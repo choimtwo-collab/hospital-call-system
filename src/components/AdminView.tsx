@@ -129,17 +129,31 @@ export const AdminView: React.FC<AdminViewProps> = ({
     if (!file) return;
 
     setIsExcelUploading(true);
-    const result = await parseDutyExcel(file);
-    setIsExcelUploading(false);
-    setExcelPreview(result);
+    try {
+      const result = await parseDutyExcel(file, dutyRoles);
+      setIsExcelUploading(false);
+      setExcelPreview(result);
+      if (!result.success) {
+        alert(`엑셀 파일 파싱 오류: ${result.message}`);
+      }
+    } catch (err: any) {
+      setIsExcelUploading(false);
+      alert(`파일을 읽는 중 오류가 발생했습니다: ${err.message || err}`);
+    }
   };
 
   const handleApplyExcelData = () => {
     if (!excelPreview || !excelPreview.success) return;
-    setSchedules(prev => ({
-      ...prev,
-      ...excelPreview.schedules
-    }));
+    setSchedules(prev => {
+      const next = { ...prev };
+      for (const [d, s] of Object.entries(excelPreview.schedules)) {
+        next[d] = {
+          ...(prev[d] || {}),
+          ...s
+        };
+      }
+      return next;
+    });
     showSaveSuccess(`엑셀 데이터 ${excelPreview.rowCount}일치가 당직표에 성공적으로 반영되었습니다!`);
     setExcelPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -440,11 +454,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
       const updatedWards = exists 
         ? g.wards.filter(w => !areWardsEqual(w, ward)) 
         : [...g.wards.filter(w => !areWardsEqual(w, ward)), ward];
-      return {
-        ...g,
-        wards: updatedWards
-      };
+      const updatedTitle = updatedWards.length > 0 ? updatedWards.join(', ') : g.title;
+      return { ...g, wards: updatedWards, title: updatedTitle };
     }));
+    showSaveSuccess(`병동 ${ward}이(가) 업데이트되었습니다.`);
   };
 
   const handleSyncGroupTitleWithWards = (groupId: string) => {
@@ -725,6 +738,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     ref={fileInputRef}
                     type="file"
                     accept=".xlsx, .xls, .csv"
+                    onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -745,27 +759,31 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </button>
                 </div>
 
-                <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-800">
+                <div className="max-h-48 overflow-x-auto overflow-y-auto rounded-xl border border-slate-800">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-800 text-slate-400 font-semibold sticky top-0">
+                    <thead className="bg-slate-800 text-slate-300 font-semibold sticky top-0">
                       <tr>
-                        <th className="p-2">날짜</th>
-                        <th className="p-2">내과1</th>
-                        <th className="p-2">내과2</th>
-                        <th className="p-2">비내과1</th>
-                        <th className="p-2">비내과2</th>
-                        <th className="p-2">비내과3</th>
+                        <th className="p-2 whitespace-nowrap bg-slate-800">날짜</th>
+                        {(excelPreview.columns && excelPreview.columns.length > 0
+                          ? excelPreview.columns
+                          : ['내과 1', '내과 2', '비내과 1', '비내과 2', '비내과 3']
+                        ).map(col => (
+                          <th key={col} className="p-2 whitespace-nowrap bg-slate-800">{col}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-medium">
                       {excelPreview.dates.slice(0, 10).map(d => (
                         <tr key={d} className="hover:bg-slate-800/40">
-                          <td className="p-2 text-cyan-300 font-bold">{d}</td>
-                          <td className="p-2 text-slate-300">{excelPreview.schedules[d]?.[ROLES.IM_1]}</td>
-                          <td className="p-2 text-slate-300">{excelPreview.schedules[d]?.[ROLES.IM_2]}</td>
-                          <td className="p-2 text-slate-300">{excelPreview.schedules[d]?.[ROLES.NON_IM_1]}</td>
-                          <td className="p-2 text-slate-300">{excelPreview.schedules[d]?.[ROLES.NON_IM_2]}</td>
-                          <td className="p-2 text-slate-300">{excelPreview.schedules[d]?.[ROLES.NON_IM_3]}</td>
+                          <td className="p-2 text-cyan-300 font-bold whitespace-nowrap">{d}</td>
+                          {(excelPreview.columns && excelPreview.columns.length > 0
+                            ? excelPreview.columns
+                            : ['내과 1', '내과 2', '비내과 1', '비내과 2', '비내과 3']
+                          ).map(col => (
+                            <td key={col} className="p-2 text-slate-300 whitespace-nowrap">
+                              {excelPreview.schedules[d]?.[col] || getScheduleDoctor(excelPreview.schedules[d], col) || '-'}
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
