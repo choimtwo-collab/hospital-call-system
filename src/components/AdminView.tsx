@@ -3,7 +3,7 @@ import {
   Settings, Users, Calendar, Phone, Plus, Trash2, Grid, Clock, 
   RotateCcw, Download, Upload, Save, CheckCircle2, AlertCircle, Search,
   FileSpreadsheet, Sliders, Tag, ArrowRight, Shield, ToggleLeft, ToggleRight,
-  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw
+  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2
 } from 'lucide-react';
 import { 
   ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS 
@@ -66,7 +66,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
   const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
   const [dutyPhoneDeptFilter, setDutyPhoneDeptFilter] = useState<'ALL' | '내과' | '비내과'>('ALL');
-  const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('timeslot');
+  const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('schedule');
+  const [editingWardsPostId, setEditingWardsPostId] = useState<string | null>(null);
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number>(1); // 1 = Monday
   const [newDateInput, setNewDateInput] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -300,6 +301,47 @@ export const AdminView: React.FC<AdminViewProps> = ({
       }
       return updated;
     });
+  };
+
+  // --- Common Nurse Handlers ---
+  const handleUpdateTimeSlot = (id: string, field: 'start' | 'end' | 'name', value: string) => {
+    setTimeSlots(prev => prev.map(ts => ts.id === id ? { ...ts, [field]: value } : ts));
+    showSaveSuccess('근무 시간대가 성공적으로 수정되었습니다.');
+  };
+
+  const handleAddCNPost = () => {
+    const nextNum = cnPosts.length + 1;
+    const newId = `CN${Date.now()}`;
+    const newPost: CNPost = {
+      id: newId,
+      name: `공통전담${nextNum}`,
+      wards: [],
+      phone: `010-1000-20${nextNum < 10 ? '0' + nextNum : nextNum}`,
+      ucap: `530${nextNum < 10 ? '0' + nextNum : nextNum}`,
+      dumcTalk: `공통전담${nextNum}조`
+    };
+    setCnPosts(prev => [...prev, newPost]);
+    showSaveSuccess(`새 공통전담 포스트(${newPost.name})가 추가되었습니다.`);
+  };
+
+  const handleDeleteCNPost = (id: string, name: string) => {
+    if (confirm(`'${name}' 포스트를 삭제하시겠습니까?`)) {
+      setCnPosts(prev => prev.filter(p => p.id !== id));
+      showSaveSuccess(`'${name}' 포스트가 삭제되었습니다.`);
+    }
+  };
+
+  const handleUpdateCNPost = (id: string, field: keyof CNPost, value: any) => {
+    setCnPosts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
+
+  const handleToggleWardForPost = (postId: string, ward: string) => {
+    setCnPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      const exists = p.wards.includes(ward);
+      const updatedWards = exists ? p.wards.filter(w => w !== ward) : [...p.wards, ward];
+      return { ...p, wards: updatedWards };
+    }));
   };
 
   // --- Task Master Handlers ---
@@ -2048,86 +2090,423 @@ export const AdminView: React.FC<AdminViewProps> = ({
       )}
 
       {/* ==================================================================== */}
-      {/* TAB 5: COMMON NURSE SCHEDULE MATRIX                                 */}
+      {/* TAB 5: COMMON NURSE SCHEDULE MATRIX & CONFIGURATION                 */}
       {/* ==================================================================== */}
       {adminTab === 'common_nurse' && (
-        <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-6">
+          
+          {/* Header & Sub-Tab Navigation Bar */}
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                 <Clock className="w-5 h-5 text-cyan-400" />
-                공통전담간호사 근무 매트릭스 설정
+                공통전담간호사 근무 매트릭스 & 포스트 설정
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                요일별/시간대별(Day, Evening, Night) 전담간호사 배정 및 병동 포스트를 관리합니다.
+              <p className="text-xs text-slate-400 mt-1">
+                3교대 근무시간대 조정, 담당 포스트(공통전담 1, 2, 3...)의 공용 UCAP·핸드폰 번호, 관할 병동 매핑 및 요일별 스케쥴을 통합 관리합니다.
               </p>
             </div>
 
-            {/* Day of Week Selector */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-2xl border border-slate-800">
-              {DAYS_OF_WEEK.map((dayName, idx) => (
-                <button
-                  key={dayName}
-                  onClick={() => setSelectedDayOfWeek(idx)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                    selectedDayOfWeek === idx
-                      ? 'bg-cyan-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {dayName.substring(0, 1)}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800 shrink-0">
+              <button
+                onClick={() => setAdminCNSubTab('schedule')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  adminCNSubTab === 'schedule'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                요일별 근무표 스케쥴
+              </button>
+
+              <button
+                onClick={() => setAdminCNSubTab('wards')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  adminCNSubTab === 'wards'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Phone className="w-3.5 h-3.5" />
+                포스트 & UCAP/핸드폰 & 병동 설정 ({cnPosts.length})
+              </button>
+
+              <button
+                onClick={() => setAdminCNSubTab('timeslot')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  adminCNSubTab === 'timeslot'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                3교대 시간대 설정
+              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-800">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-800/90 text-slate-300 font-bold">
-                <tr>
-                  <th className="p-3">담당 포스트</th>
-                  <th className="p-3">관할 병동</th>
-                  <th className="p-3">Day (06:30 ~ 14:30)</th>
-                  <th className="p-3">Evening (14:30 ~ 22:00)</th>
-                  <th className="p-3">Night (22:00 ~ 06:30)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
-                {cnPosts.filter(p => p.wards.length > 0).map(post => (
-                  <tr key={post.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 text-cyan-300 font-bold">
-                      {post.name}
-                      <span className="text-[10px] text-slate-500 block font-normal">UCAP: {post.ucap}</span>
-                    </td>
-                    <td className="p-3 text-slate-300">{post.wards.join(', ')}</td>
-                    {['ts_day', 'ts_eve', 'ts_night'].map(tsId => (
-                      <td key={tsId} className="p-2">
+          {/* ================================================================ */}
+          {/* 1. SUB-TAB: 3-SHIFT TIME SLOT CONFIGURATION                      */}
+          {/* ================================================================ */}
+          {adminCNSubTab === 'timeslot' && (
+            <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-cyan-400" />
+                    공통전담간호사 3교대(Day, Evening, Night) 근무 시간대 조정
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    기본 3교대 근무 시간을 관리자가 원내 운영 상황에 맞추어 직접 변경할 수 있습니다.
+                  </p>
+                </div>
+                <div className="text-[11px] text-cyan-300 font-bold bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-xl">
+                  💡 시간대 변경 시 당직 호출 시스템 판별에 즉시 반영
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {timeSlots.map((ts, idx) => {
+                  const icons = ['☀️', '🌅', '🌙'];
+                  const colors = [
+                    'border-amber-500/40 bg-gradient-to-b from-amber-950/20 to-slate-900',
+                    'border-orange-500/40 bg-gradient-to-b from-orange-950/20 to-slate-900',
+                    'border-indigo-500/40 bg-gradient-to-b from-indigo-950/20 to-slate-900'
+                  ];
+                  return (
+                    <div key={ts.id} className={`p-5 rounded-2xl border ${colors[idx % 3]} space-y-4 shadow-lg`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl">{icons[idx % 3]}</span>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-300">
+                          {ts.start} ~ {ts.end}
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400 block mb-1">근무명</label>
                         <input
                           type="text"
-                          value={weeklyCNSchedule[selectedDayOfWeek]?.[tsId]?.[post.id] || ''}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setWeeklyCNSchedule(prev => ({
-                              ...prev,
-                              [selectedDayOfWeek]: {
-                                ...prev[selectedDayOfWeek],
-                                [tsId]: {
-                                  ...(prev[selectedDayOfWeek]?.[tsId] || {}),
-                                  [post.id]: val
-                                }
-                              }
-                            }));
-                          }}
-                          placeholder="근무자명"
-                          className="w-full bg-slate-900 border border-slate-700/60 rounded-lg px-2 py-1 text-xs text-slate-200"
+                          value={ts.name}
+                          onChange={e => handleUpdateTimeSlot(ts.id, 'name', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400"
                         />
-                      </td>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400 block mb-1">시작 시간</label>
+                          <input
+                            type="time"
+                            value={ts.start}
+                            onChange={e => handleUpdateTimeSlot(ts.id, 'start', e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2 py-2 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-400 block mb-1">종료 시간</label>
+                          <input
+                            type="time"
+                            value={ts.end}
+                            onChange={e => handleUpdateTimeSlot(ts.id, 'end', e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2 py-2 text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================ */}
+          {/* 2. SUB-TAB: POSTS, UCAP, PHONE & WARDS CONFIGURATION             */}
+          {/* ================================================================ */}
+          {adminCNSubTab === 'wards' && (
+            <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-cyan-400" />
+                    공통전담 포스트(1, 2, 3...) 공용 UCAP·핸드폰 & 관할 병동 관리
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    포스트별 공용 UCAP과 핸드폰 번호를 입력하고, 담당할 병동을 셋팅하거나 새 포스트를 추가/삭제합니다.
+                  </p>
+                </div>
+                <button
+                  onClick={handleAddCNPost}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  새 공통전담 포스트 추가
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-900 text-slate-300 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3 w-32">포스트 명칭</th>
+                      <th className="p-3 w-36">공용 UCAP</th>
+                      <th className="p-3 w-44">공용 핸드폰 번호</th>
+                      <th className="p-3">관할 병동 셋팅</th>
+                      <th className="p-3 w-16 text-center">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {cnPosts.map(post => (
+                      <tr key={post.id} className="hover:bg-slate-900/40 transition">
+                        {/* 포스트 명칭 */}
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            value={post.name}
+                            onChange={e => handleUpdateCNPost(post.id, 'name', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </td>
+
+                        {/* 공용 UCAP */}
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            value={post.ucap}
+                            placeholder="예: 53001"
+                            onChange={e => handleUpdateCNPost(post.id, 'ucap', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </td>
+
+                        {/* 공용 핸드폰 */}
+                        <td className="p-2.5">
+                          <input
+                            type="text"
+                            value={post.phone}
+                            placeholder="예: 010-1000-2001"
+                            onChange={e => handleUpdateCNPost(post.id, 'phone', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400"
+                          />
+                        </td>
+
+                        {/* 관할 병동 */}
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {post.wards.map(w => (
+                              <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/50 text-[11px] font-bold">
+                                {w}
+                                <button
+                                  onClick={() => handleToggleWardForPost(post.id, w)}
+                                  className="hover:text-rose-400 transition"
+                                  title="제거"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+
+                            <button
+                              onClick={() => setEditingWardsPostId(post.id)}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+                            >
+                              + 병동 선택/추가
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* 삭제 */}
+                        <td className="p-2.5 text-center">
+                          <button
+                            onClick={() => handleDeleteCNPost(post.id, post.name)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                            title="포스트 삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================ */}
+          {/* 3. SUB-TAB: WEEKLY SHIFT MATRIX SCHEDULE INPUT                   */}
+          {/* ================================================================ */}
+          {adminCNSubTab === 'schedule' && (
+            <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-5">
+              
+              {/* Top Controls: Day of Week & Quick Links */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-cyan-400" />
+                    요일별 전담간호사 근무자 입력
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    해당 요일에 각 포스트 및 교대시간별로 근무할 간호사 이름을 직접 입력합니다.
+                  </p>
+                </div>
+
+                {/* Day of Week Selector */}
+                <div className="flex items-center gap-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                  {DAYS_OF_WEEK.map((dayName, idx) => (
+                    <button
+                      key={dayName}
+                      onClick={() => setSelectedDayOfWeek(idx)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                        selectedDayOfWeek === idx
+                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {dayName.substring(0, 1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Matrix Table */}
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-900 text-slate-300 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3 w-48">담당 포스트 (공용 UCAP / 핸드폰)</th>
+                      <th className="p-3 w-44">관할 병동</th>
+                      {timeSlots.map(ts => (
+                        <th key={ts.id} className="p-3">
+                          <div className="flex items-center gap-1.5">
+                            <span>{ts.name}</span>
+                            <span className="text-[10px] text-cyan-400 font-mono font-normal">
+                              ({ts.start} ~ {ts.end})
+                            </span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {cnPosts.map(post => (
+                      <tr key={post.id} className="hover:bg-slate-900/40 transition">
+                        {/* 담당 포스트 & 연락처 */}
+                        <td className="p-3">
+                          <div className="font-extrabold text-cyan-300 text-xs">{post.name}</div>
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 font-mono">
+                            <span>UCAP: <strong className="text-white">{post.ucap}</strong></span>
+                            {post.phone && <span>· 폰: {post.phone}</span>}
+                          </div>
+                        </td>
+
+                        {/* 관할 병동 */}
+                        <td className="p-3 text-slate-300">
+                          {post.wards.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {post.wards.map(w => (
+                                <span key={w} className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 border border-slate-700">
+                                  {w}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-500 italic">미배정 (병동 설정 요망)</span>
+                          )}
+                        </td>
+
+                        {/* 교대별 간호사 이름 인풋 */}
+                        {timeSlots.map(ts => (
+                          <td key={ts.id} className="p-2">
+                            <input
+                              type="text"
+                              value={weeklyCNSchedule[selectedDayOfWeek]?.[ts.id]?.[post.id] || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setWeeklyCNSchedule(prev => ({
+                                  ...prev,
+                                  [selectedDayOfWeek]: {
+                                    ...prev[selectedDayOfWeek],
+                                    [ts.id]: {
+                                      ...(prev[selectedDayOfWeek]?.[ts.id] || {}),
+                                      [post.id]: val
+                                    }
+                                  }
+                                }));
+                              }}
+                              placeholder="근무자명"
+                              className="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 focus:bg-slate-900"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================ */}
+          {/* MODAL: WARD SELECTION POPOVER / MODAL                            */}
+          {/* ================================================================ */}
+          {editingWardsPostId && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-cyan-400" />
+                      관할 병동 선택 - {cnPosts.find(p => p.id === editingWardsPostId)?.name}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      해당 포스트가 전담할 병동을 클릭하여 선택하거나 해제하세요.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEditingWardsPostId(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Ward Chips Grid */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto p-1">
+                  {ALL_WARDS.map(ward => {
+                    const currentPost = cnPosts.find(p => p.id === editingWardsPostId);
+                    const isSelected = currentPost?.wards.includes(ward);
+                    return (
+                      <button
+                        key={ward}
+                        onClick={() => handleToggleWardForPost(editingWardsPostId, ward)}
+                        className={`p-2.5 rounded-xl text-xs font-bold text-center transition border ${
+                          isSelected
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        {ward}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <span className="text-xs text-slate-400">
+                    선택된 병동 수: <strong className="text-cyan-400">{cnPosts.find(p => p.id === editingWardsPostId)?.wards.length || 0}개</strong>
+                  </span>
+                  <button
+                    onClick={() => setEditingWardsPostId(null)}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20"
+                  >
+                    선택 완료
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
