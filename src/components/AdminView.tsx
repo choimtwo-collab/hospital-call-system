@@ -103,6 +103,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [newTaskSpecialty, setNewTaskSpecialty] = useState<SpecialtyType>('내과계');
   const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>('검사');
   const [newTaskNurseSupport, setNewTaskNurseSupport] = useState<'Y' | 'N'>('N');
+  const [newTaskNurseNote, setNewTaskNurseNote] = useState('');
   const [newTaskTimeRule, setNewTaskTimeRule] = useState<TimeRuleType>('정규/당직 분리형');
   const [newTaskDesc, setNewTaskDesc] = useState('');
 
@@ -553,6 +554,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       dept: deptCompat,
       category: newTaskCategory,
       isNurseSupport: newTaskNurseSupport,
+      nurseSupportNote: newTaskNurseNote.trim() || undefined,
       timeRuleType: newTaskTimeRule,
       description: newTaskDesc.trim() || undefined
     };
@@ -560,6 +562,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setTasks(prev => [...prev, newTask]);
     setNewTaskCode('');
     setNewTaskName('');
+    setNewTaskNurseNote('');
     setNewTaskDesc('');
     showSaveSuccess(`[${newTask.code}] '${newTask.name}' 업무가 마스터에 성공적으로 등록되었습니다.`);
   };
@@ -1372,12 +1375,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   <span>7. 상세 설명 및 매칭 가이드</span>
                   <span className="text-[10px] text-slate-400 font-normal ml-1">(간호사 호출 화면 안내 문구)</span>
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={newTaskDesc}
                   onChange={e => setNewTaskDesc(e.target.value)}
-                  placeholder='예: "06:00~08:00 평일 EKG는 임상병리사 담당입니다."'
-                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  placeholder='예: "• 평일 06:00~08:00 (아침 정규): 일자별 지정된 임상병리사 연결..."'
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 resize-none"
                 />
               </div>
             </div>
@@ -1532,8 +1535,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           </td>
 
                           {/* 3. 업무명 */}
-                          <td className="p-3 font-bold text-white whitespace-nowrap">
-                            {task.name}
+                          <td className="p-3 font-bold text-white whitespace-pre-line leading-tight">
+                            {task.name.includes(' (') ? (
+                              <div>
+                                <span className="text-white text-[13px]">{task.name.split(' (')[0]}</span>
+                                <span className="block text-[11px] font-medium text-slate-400 mt-0.5">({task.name.split(' (').slice(1).join(' (')}</span>
+                              </div>
+                            ) : (
+                              task.name
+                            )}
                           </td>
 
                           {/* 4. 업무 분류 */}
@@ -1551,13 +1561,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           {/* 5. 전담간호사 지원 */}
                           <td className="p-3 text-center whitespace-nowrap">
                             {isSupp ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                Y 지원
-                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Y
+                                </span>
+                                {task.nurseSupportNote && task.nurseSupportNote !== '상시 지원' ? (
+                                  <span className="text-[10px] text-emerald-400/80 mt-0.5 font-medium">({task.nurseSupportNote})</span>
+                                ) : null}
+                              </div>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-800 text-slate-400 border border-slate-700">
-                                N 불가
-                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-800 text-slate-400 border border-slate-700">
+                                  N
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                  ({task.nurseSupportNote || '지원 불가'})
+                                </span>
+                              </div>
                             )}
                           </td>
 
@@ -1575,11 +1595,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           </td>
 
                           {/* 7. 상세 설명 및 매칭 가이드 */}
-                          <td className="p-3 text-slate-400 text-xs">
+                          <td className="p-3 text-slate-300 text-xs min-w-[320px] max-w-2xl">
                             {task.description ? (
-                              <span className="line-clamp-1" title={task.description}>
+                              <div className="whitespace-pre-line text-[11px] leading-relaxed text-slate-300 py-1" title={task.description}>
                                 {task.description}
-                              </span>
+                              </div>
                             ) : (
                               <span className="text-slate-600">-</span>
                             )}
@@ -1687,6 +1707,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </div>
 
                   <div>
+                    <label className="text-[11px] font-bold text-slate-300 mb-1 block">전담 지원 상세 메모 (선택)</label>
+                    <input
+                      type="text"
+                      value={editingTask.nurseSupportNote || ''}
+                      onChange={e => setEditingTask({ ...editingTask, nurseSupportNote: e.target.value })}
+                      placeholder="예: 지원 불가, 정규 지원 불가"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
                     <label className="text-[11px] font-bold text-slate-300 mb-1 block">시간대별 매칭 룰 (Time_Rule_Type)</label>
                     <select
                       value={editingTask.timeRuleType || '정규/당직 분리형'}
@@ -1701,12 +1732,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
                   <div className="sm:col-span-2">
                     <label className="text-[11px] font-bold text-slate-300 mb-1 block">상세 설명 및 매칭 가이드 (Description)</label>
-                    <input
-                      type="text"
+                    <textarea
+                      rows={3}
                       value={editingTask.description || ''}
                       onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
                       placeholder="간호사 호출 화면에 띄워줄 안내 문구"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white resize-none"
                     />
                   </div>
                 </div>

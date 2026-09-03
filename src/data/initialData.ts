@@ -64,6 +64,7 @@ export const ALL_WARDS = [
 
 // 초기 업무 마스터 정의 (새로운 마스터 테이블 필드 규격)
 export const initialTasks: TaskItem[] = [
+  // ① 검사 및 채혈 카테고리 (Category: 검사)
   {
     id: 'TSK_EKG_P',
     code: 'TSK_EKG_P',
@@ -72,30 +73,57 @@ export const initialTasks: TaskItem[] = [
     dept: 'ALL',
     category: '검사',
     isNurseSupport: 'N',
+    nurseSupportNote: '지원 불가',
     timeRuleType: '특정 시간 예외형',
-    description: '06:00~08:00 평일 EKG는 임상병리사 담당입니다.'
+    description: `• 평일 06:00~08:00 (아침 정규): 일자별 지정된 임상병리사 연결.
+• 평일 정규 (08:00~17:00):
+  - 내과계: 인턴 개인 UCAP 연결.
+  - 비내과계: 당직인턴2 (Group C 병동) 또는 당직인턴3 (Group D 병동) 연결.
+• 정규 외 (야간/주말):
+  - 내과계: 병동 Group 1 및 MICU는 내과계 당직인턴1 / 병동 Group 2는 내과계 당직인턴2 연결.
+  - 비내과계: 당직인턴2 (Group C) 또는 당직인턴3 (Group D) 연결.`
   },
   {
-    id: 'TSK_BLOOD_CON',
-    code: 'TSK_BLOOD_CON',
-    name: '수혈동의서',
+    id: 'TSK_ABGA',
+    code: 'TSK_ABGA',
+    name: 'ABGA (동맥혈 가스분석)',
     specialtyType: '공통',
     dept: 'ALL',
-    category: '동의서',
+    category: '검사',
     isNurseSupport: 'N',
+    nurseSupportNote: '정규 지원 불가',
     timeRuleType: '정규/당직 분리형',
-    description: '정규시간 해당과 인턴 / 야간·당직 내과1 또는 비내과 담당'
+    description: `• 평일 정규 (08:00~17:00):
+  - 내과계: MICU는 인턴 / MICU 외 일반병동은 공통 전담간호사 연결.
+  - 비내과계: 당직인턴2 (Group C) 또는 당직인턴3 (Group D).
+• 정규 외 (야간/주말):
+  - 내과계: MICU는 내과계 당직인턴1 / 일반병동 Group 1은 당직 전담간호사 / 일반병동 Group 2는 야간(22:00~08:00)에 내과계 당직인턴2 (그 외 당직 시간은 공통 전담간호사) 연결.
+  - 비내과계: 당직인턴2 (Group C) 또는 당직인턴3 (Group D).`
   },
   {
-    id: 'TSK_ABGA_CULT',
-    code: 'TSK_ABGA_CULT',
-    name: 'ABGA/Line 통한 채혈 및 Blood culture',
-    specialtyType: '내과계',
-    dept: '내과',
+    id: 'TSK_LINE_BLOOD',
+    code: 'TSK_LINE_BLOOD',
+    name: 'Line 채혈 (Blood culture 포함)',
+    specialtyType: '공통',
+    dept: 'ALL',
+    category: '검사',
+    isNurseSupport: 'N',
+    nurseSupportNote: '정규 지원 불가',
+    timeRuleType: '정규/당직 분리형',
+    description: `• C-line, PICC, Chemoport, A-line 등 기준 line을 통한 채혈 업무입니다.
+• 매칭 및 라우팅 규칙은 위의 ABGA 규칙과 100% 동일하게 작동합니다 (시간대/병동별 내과계, 비내과계 분기 동일 적용).`
+  },
+  {
+    id: 'TSK_PERIPH_BLOOD',
+    code: 'TSK_PERIPH_BLOOD',
+    name: 'Peripheral vein 채혈 (일반 정맥 채혈)',
+    specialtyType: '공통',
+    dept: 'ALL',
     category: '검사',
     isNurseSupport: 'Y',
-    timeRuleType: '정규/당직 분리형',
-    description: '정규 해당과 인턴 / 야간 MICU 내과1, 병동 전담간호사 지원'
+    nurseSupportNote: '상시 지원',
+    timeRuleType: '시간대 무관 고정형',
+    description: `• 진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.`
   },
   {
     id: 'TSK_GEN_PROC',

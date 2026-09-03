@@ -176,7 +176,12 @@ export function evaluateDutyRules(
     // 규칙 1: 내과계 (Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else if (selectedDept === '내과') {
-      if (isRegularHours) {
+      // Peripheral vein 채혈: 상시 공통 전담간호사
+      if (isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초')) {
+        assignedRole = ROLES.COMMON_NURSE;
+        notes = '진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.';
+      }
+      else if (isRegularHours) {
         // 평일 정규시간 (08:00 ~ 17:00)
         if (isTask('그외 술기') || isTask('동의서')) {
           assignedRole = ROLES.COMMON_NURSE;
@@ -184,8 +189,16 @@ export function evaluateDutyRules(
         } else if (isTask('Primary Call')) {
           assignedRole = ROLES.DUTY_NURSE;
           notes = 'Primary Call은 전담간호사가 우선 접수합니다.';
+        } else if (isTask('ABGA') || isTask('Blood culture') || isTask('Line 채혈')) {
+          if (selectedWard === 'MICU') {
+            assignedRole = ROLES.INTERN;
+            notes = '평일 정규시간 MICU ABGA/Line 채혈은 해당과 인턴 담당입니다.';
+          } else {
+            assignedRole = ROLES.COMMON_NURSE;
+            notes = '평일 정규시간 일반병동 ABGA/Line 채혈은 공통 전담간호사 연결입니다.';
+          }
         } else {
-          // EKG(P), 수혈동의서, T-tube 교체, ABGA/Line 채혈(Blood Culture) -> 해당과 인턴
+          // EKG(P), 수혈동의서, T-tube 교체 등 -> 해당과 인턴
           assignedRole = ROLES.INTERN;
           notes = '평일 정규시간 필수 술기는 해당 진료과 인턴 담당입니다.';
         }
@@ -256,8 +269,13 @@ export function evaluateDutyRules(
     // 규칙 2: 비내과계 (Non-Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else {
+      // Peripheral vein 채혈: 상시 공통 전담간호사
+      if (isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초')) {
+        assignedRole = ROLES.COMMON_NURSE;
+        notes = '진료과 및 시간대에 상관없이 언제나 공통 전담간호사 상시 지원 대상입니다.';
+      }
       // 비내과계 특수 및 공통 예외 업무
-      if (isTask('통합의학과 사망선언')) {
+      else if (isTask('통합의학과 사망선언')) {
         assignedRole = ROLES.NON_IM_2;
         dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
         dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];

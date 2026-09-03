@@ -81,6 +81,7 @@ export interface TaskItem {
   dept?: '내과' | '비내과' | 'ALL'; // 하위 호환 진료계열
   category: TaskCategory; // 업무 분류 카테고리 (Category: 검사 / 치료 및 처치 / 동의서 / 사망 및 기타)
   isNurseSupport: 'Y' | 'N' | boolean; // 전담간호사 지원 가능 여부 (Is_Nurse_Support: Y / N)
+  nurseSupportNote?: string; // 전담 지원 상세 설명 (예: '지원 불가', '정규 지원 불가')
   timeRuleType: TimeRuleType; // 시간대별 매칭 룰 (Time_Rule_Type: 정규/당직 분리형 / 시간대 무관 고정형 / 특정 시간 예외형)
   description?: string; // 상세 설명 및 매칭 가이드 (Description)
 }
