@@ -5,7 +5,8 @@ import { AdminView } from './components/AdminView';
 import { 
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
-  initialCustomRules, initialInterns, initialPathologistSchedules
+  initialCustomRules, initialInterns, initialPathologistSchedules,
+  initialDutyRoles
 } from './data/initialData';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
@@ -25,7 +26,8 @@ const STORAGE_KEYS = {
   CUSTOM_RULES: 'hcs_custom_rules_v1',
   INTERNS: 'hcs_interns_v1',
   PATHOLOGISTS: 'hcs_pathologists_v1',
-  SHEETS_CONFIG: 'hcs_sheets_config_v1'
+  SHEETS_CONFIG: 'hcs_sheets_config_v1',
+  DUTY_ROLES: 'hcs_duty_roles_v1'
 };
 
 export default function App() {
@@ -82,6 +84,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_SHEETS_CONFIG;
   });
 
+  const [dutyRoles, setDutyRoles] = useState<string[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DUTY_ROLES);
+    return saved ? JSON.parse(saved) : initialDutyRoles;
+  });
+
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
@@ -89,6 +96,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(schedules));
   }, [schedules]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DUTY_ROLES, JSON.stringify(dutyRoles));
+  }, [dutyRoles]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
@@ -183,6 +194,7 @@ export default function App() {
     setInterns(initialInterns);
     setPathologistSchedules(initialPathologistSchedules);
     setSheetsConfig(DEFAULT_SHEETS_CONFIG);
+    setDutyRoles(initialDutyRoles);
   };
 
   return (
@@ -237,6 +249,8 @@ export default function App() {
             setPathologistSchedules={setPathologistSchedules}
             sheetsConfig={sheetsConfig}
             setSheetsConfig={setSheetsConfig}
+            dutyRoles={dutyRoles}
+            setDutyRoles={setDutyRoles}
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}

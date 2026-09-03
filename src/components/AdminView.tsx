@@ -14,6 +14,8 @@ import {
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
+import { CalendarDutyView } from './CalendarDutyView';
+import { getScheduleDoctor } from '../utils/dutyRules';
 
 interface AdminViewProps {
   schedules: DateScheduleMap;
@@ -36,6 +38,8 @@ interface AdminViewProps {
   setPathologistSchedules: React.Dispatch<React.SetStateAction<PathologistSchedule[]>>;
   sheetsConfig: GoogleSheetsConfig;
   setSheetsConfig: React.Dispatch<React.SetStateAction<GoogleSheetsConfig>>;
+  dutyRoles: string[];
+  setDutyRoles: React.Dispatch<React.SetStateAction<string[]>>;
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
@@ -52,10 +56,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
   interns, setInterns,
   pathologistSchedules, setPathologistSchedules,
   sheetsConfig, setSheetsConfig,
+  dutyRoles, setDutyRoles,
   onSyncSheets, isSyncingSheets,
   onResetData
 }) => {
   const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
+  const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
   const [adminCNSubTab, setAdminCNSubTab] = useState<'timeslot' | 'wards' | 'schedule'>('timeslot');
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number>(1); // 1 = Monday
   const [newDateInput, setNewDateInput] = useState<string>('');
@@ -190,6 +196,32 @@ export const AdminView: React.FC<AdminViewProps> = ({
       setPathologistSchedules(prev => prev.filter(p => p.id !== id));
       showSaveSuccess('임상병리사 일정이 삭제되었습니다.');
     }
+  };
+
+  // --- Duty Role (구분) Handlers ---
+  const handleAddDutyRole = (roleName: string) => {
+    setDutyRoles(prev => [...prev, roleName]);
+    showSaveSuccess(`새 구분 '${roleName}'이(가) 추가되었습니다.`);
+  };
+
+  const handleDeleteDutyRole = (roleName: string) => {
+    setDutyRoles(prev => prev.filter(r => r !== roleName));
+    showSaveSuccess(`구분 '${roleName}'이(가) 삭제되었습니다.`);
+  };
+
+  const handleRenameDutyRole = (oldName: string, newName: string) => {
+    setDutyRoles(prev => prev.map(r => r === oldName ? newName : r));
+    setSchedules(prev => {
+      const next = { ...prev };
+      for (const d of Object.keys(next)) {
+        if (next[d][oldName]) {
+          next[d][newName] = next[d][oldName];
+          delete next[d][oldName];
+        }
+      }
+      return next;
+    });
+    showSaveSuccess(`구분명이 '${newName}'(으)로 변경되었습니다.`);
   };
 
   // --- Task Master Handlers ---
@@ -483,79 +515,129 @@ export const AdminView: React.FC<AdminViewProps> = ({
             )}
           </div>
 
-          {/* Grid View Table */}
-          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Grid className="w-5 h-5 text-cyan-400" />
-                  일자별 인턴 당직표 수동 그리드 편집
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  셀을 직접 클릭하여 수정하거나, 날짜를 새로 추가/삭제할 수 있습니다.
-                </p>
-              </div>
+          {/* Schedule View Mode Switcher */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setScheduleViewMode('calendar')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition ${
+                  scheduleViewMode === 'calendar'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                달력형 주차별 뷰 (이미지 1 스타일)
+              </button>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={newDateInput}
-                  onChange={e => setNewDateInput(e.target.value)}
-                  className="bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-                />
-                <button
-                  onClick={handleAddDate}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-sm"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  행 추가
-                </button>
-              </div>
+              <button
+                onClick={() => setScheduleViewMode('list')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition ${
+                  scheduleViewMode === 'list'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Grid className="w-4 h-4" />
+                일자별 수직 목록 뷰
+              </button>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-800/90 text-slate-300 font-bold uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3 w-32">일자</th>
-                    <th className="p-3">내과1 (인턴1)</th>
-                    <th className="p-3">내과2 (인턴2)</th>
-                    <th className="p-3">비내과1 (당직인턴1)</th>
-                    <th className="p-3">비내과2 (당직인턴2)</th>
-                    <th className="p-3">비내과3 (당직인턴3)</th>
-                    <th className="p-3 w-16 text-center">삭제</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {Object.keys(schedules).sort().map(date => (
-                    <tr key={date} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-bold text-cyan-300 whitespace-nowrap">{date}</td>
-                      {[ROLES.IM_1, ROLES.IM_2, ROLES.NON_IM_1, ROLES.NON_IM_2, ROLES.NON_IM_3].map(role => (
-                        <td key={role} className="p-2">
-                          <input
-                            type="text"
-                            value={schedules[date]?.[role] || ''}
-                            onChange={e => handleScheduleChange(date, role, e.target.value)}
-                            placeholder="당직자명"
-                            className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 focus:bg-slate-900"
-                          />
-                        </td>
-                      ))}
-                      <td className="p-2 text-center">
-                        <button
-                          onClick={() => handleDeleteDate(date)}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>
+                {scheduleViewMode === 'calendar' 
+                  ? '구분(내과1, 2, 비내과1...)을 자유롭게 추가/삭제하고 각 일자별 당직자를 직접 입력합니다.' 
+                  : '날짜별 행 단위로 확인하고 날짜를 추가/삭제합니다.'}
+              </span>
             </div>
           </div>
+
+          {/* 1. CALENDAR VIEW (IMAGE 1 STYLE) */}
+          {scheduleViewMode === 'calendar' ? (
+            <CalendarDutyView
+              schedules={schedules}
+              onScheduleChange={handleScheduleChange}
+              dutyRoles={dutyRoles}
+              onAddRole={handleAddDutyRole}
+              onDeleteRole={handleDeleteDutyRole}
+              onRenameRole={handleRenameDutyRole}
+            />
+          ) : (
+            /* 2. LIST VIEW (ORIGINAL TABLE) */
+            <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <Grid className="w-5 h-5 text-cyan-400" />
+                    일자별 인턴 당직표 수동 그리드 편집
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    셀을 직접 클릭하여 수정하거나, 날짜를 새로 추가/삭제할 수 있습니다.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={newDateInput}
+                    onChange={e => setNewDateInput(e.target.value)}
+                    className="bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    onClick={handleAddDate}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    행 추가
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-800/90 text-slate-300 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3 w-32">일자</th>
+                      <th className="p-3">내과1 (인턴1)</th>
+                      <th className="p-3">내과2 (인턴2)</th>
+                      <th className="p-3">비내과1 (당직인턴1)</th>
+                      <th className="p-3">비내과2 (당직인턴2)</th>
+                      <th className="p-3">비내과3 (당직인턴3)</th>
+                      <th className="p-3 w-14 text-center">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {Object.keys(schedules).sort().map(date => (
+                      <tr key={date} className="hover:bg-slate-800/40 transition">
+                        <td className="p-3 text-cyan-400 font-mono font-bold whitespace-nowrap">{date}</td>
+                        {[ROLES.IM_1, ROLES.IM_2, ROLES.NON_IM_1, ROLES.NON_IM_2, ROLES.NON_IM_3].map(role => (
+                          <td key={role} className="p-2">
+                            <input
+                              type="text"
+                              value={schedules[date]?.[role] || getScheduleDoctor(schedules[date], role) || ''}
+                              onChange={e => handleScheduleChange(date, role, e.target.value)}
+                              placeholder="당직자명"
+                              className="w-full bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 focus:bg-slate-900"
+                            />
+                          </td>
+                        ))}
+                        <td className="p-2 text-center">
+                          <button
+                            onClick={() => handleDeleteDate(date)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

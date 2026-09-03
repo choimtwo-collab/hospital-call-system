@@ -7,6 +7,28 @@ import {
 } from '../types';
 import { checkKoreanHoliday } from './koreanHolidays';
 
+/**
+ * 당직표에서 역할별 의사 이름을 검색합니다. ('내과 1', '내과1 (인턴1)', '비내과 1' 등 별칭 자동 처리)
+ */
+export function getScheduleDoctor(schedule: Record<string, string> | undefined, roleKey: string): string {
+  if (!schedule) return '';
+  if (schedule[roleKey]) return schedule[roleKey];
+
+  const cleanKey = roleKey.replace(/\s+/g, '');
+  for (const [k, v] of Object.entries(schedule)) {
+    if (!v) continue;
+    if (k === roleKey) return v;
+    const cleanK = k.replace(/\s+/g, '');
+    if (cleanK === cleanKey) return v;
+    if (cleanKey.includes('내과1') && cleanK.includes('내과1')) return v;
+    if (cleanKey.includes('내과2') && cleanK.includes('내과2')) return v;
+    if (cleanKey.includes('비내과1') && cleanK.includes('비내과1')) return v;
+    if (cleanKey.includes('비내과2') && cleanK.includes('비내과2')) return v;
+    if (cleanKey.includes('비내과3') && cleanK.includes('비내과3')) return v;
+  }
+  return '';
+}
+
 export function evaluateDutyRules(
   selectedDept: DepartmentType,
   selectedWard: string,
@@ -352,8 +374,11 @@ export function evaluateDutyRules(
   // 일반 인턴 및 당직의 매칭
   else if (assignedRole) {
     const todaysSchedule = schedules[selectedDate];
-    if (todaysSchedule && todaysSchedule[assignedRole]) {
-      assignedPerson = todaysSchedule[assignedRole];
+    if (todaysSchedule) {
+      const doctor = getScheduleDoctor(todaysSchedule, assignedRole);
+      if (doctor) {
+        assignedPerson = doctor;
+      }
     }
     if ([ROLES.DUTY_NURSE, ROLES.INTERN].includes(assignedRole)) {
       assignedPerson = assignedRole;
