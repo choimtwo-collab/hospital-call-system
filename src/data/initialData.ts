@@ -248,6 +248,26 @@ export const emergencyContacts: EmergencyContact[] = [
 ];
 
 export const initialPathologistSchedules: PathologistSchedule[] = [
-  { id: 'path-1', startDate: '2026-09-01', endDate: '2026-09-15', name: '황예진', phone: '010-9907-8298', ucap: '5-9907' },
-  { id: 'path-2', startDate: '2026-09-16', endDate: '2026-09-30', name: '윤은솔', phone: '010-8821-4928', ucap: '5-9908' }
+  { 
+    id: 'path-1', 
+    startDate: '2026-09-01', 
+    endDate: '2026-09-15', 
+    dayType: 'WEEKDAY', 
+    startTime: '06:00', 
+    endTime: '08:00', 
+    name: '황예진', 
+    phone: '010-9907-8298', 
+    ucap: '5-9907' 
+  },
+  { 
+    id: 'path-2', 
+    startDate: '2026-09-16', 
+    endDate: '2026-09-30', 
+    dayType: 'WEEKDAY', 
+    startTime: '06:00', 
+    endTime: '08:00', 
+    name: '윤은솔', 
+    phone: '010-8821-4928', 
+    ucap: '5-9908' 
+  }
 ];

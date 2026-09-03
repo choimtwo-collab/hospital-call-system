@@ -99,12 +99,29 @@ export function evaluateDutyRules(
   // =========================================================================
   if (!assignedRole) {
     // -----------------------------------------------------------------------
-    // 규칙 0: 임상병리사 예외 규칙
-    // 평일 06:00 ~ 08:00 사이의 정규 EKG(P) -> 임상병리사 담당
+    // 규칙 0: 임상병리사 예외 규칙 (관리자가 조정한 기간, 평일/공휴일, 시간대 적용)
     // -----------------------------------------------------------------------
-    if (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8 && isTask('EKG')) {
-      assignedRole = ROLES.PATHOLOGIST;
-      notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+    const matchedPathologist = pathologistSchedules.find(p => {
+      if (p.startDate && selectedDate < p.startDate) return false;
+      if (p.endDate && selectedDate > p.endDate) return false;
+      const dayType = p.dayType || 'WEEKDAY';
+      if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
+      if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
+      const sTime = p.startTime || '06:00';
+      const eTime = p.endTime || '08:00';
+      if (selectedTime < sTime || selectedTime >= eTime) return false;
+      return true;
+    });
+
+    if (isTask('EKG')) {
+      if (matchedPathologist) {
+        assignedRole = ROLES.PATHOLOGIST;
+        const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
+        notes = `${matchedPathologist.name} 임상병리사 순환일정 매칭 (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '08:00'})`;
+      } else if (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8) {
+        assignedRole = ROLES.PATHOLOGIST;
+        notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -306,8 +323,17 @@ export function evaluateDutyRules(
   // 임상병리사 일정 매칭
   else if (assignedRole === ROLES.PATHOLOGIST) {
     assignedPerson = '임상병리사 (EKG 전담)';
-    // 일정표에서 날짜 매칭 확인
-    const matchedPathologist = pathologistSchedules.find(p => selectedDate >= p.startDate && selectedDate <= p.endDate);
+    const matchedPathologist = pathologistSchedules.find(p => {
+      if (p.startDate && selectedDate < p.startDate) return false;
+      if (p.endDate && selectedDate > p.endDate) return false;
+      const dayType = p.dayType || 'WEEKDAY';
+      if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
+      if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
+      const sTime = p.startTime || '06:00';
+      const eTime = p.endTime || '08:00';
+      if (selectedTime < sTime || selectedTime >= eTime) return false;
+      return true;
+    });
     if (matchedPathologist) {
       assignedPerson = `${matchedPathologist.name} (임상병리사)`;
       dutyPhone = matchedPathologist.phone;

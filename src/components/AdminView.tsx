@@ -167,6 +167,31 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
   };
 
+  // --- Pathologist Handlers ---
+  const handleAddPathologistSchedule = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const newPath: PathologistSchedule = {
+      id: `path-${Date.now()}`,
+      startDate: today,
+      endDate: today,
+      dayType: 'WEEKDAY',
+      startTime: '06:00',
+      endTime: '08:00',
+      name: '',
+      phone: '',
+      ucap: ''
+    };
+    setPathologistSchedules(prev => [...prev, newPath]);
+    showSaveSuccess('새 임상병리사 순환 일정이 추가되었습니다.');
+  };
+
+  const handleDeletePathologistSchedule = (id: string) => {
+    if (confirm('이 임상병리사 일정을 삭제하시겠습니까?')) {
+      setPathologistSchedules(prev => prev.filter(p => p.id !== id));
+      showSaveSuccess('임상병리사 일정이 삭제되었습니다.');
+    }
+  };
+
   // --- Task Master Handlers ---
   const handleAddTask = () => {
     if (!newTaskName.trim()) {
@@ -1275,62 +1300,159 @@ export const AdminView: React.FC<AdminViewProps> = ({
         <div className="space-y-6">
           {/* Pathologist Schedules Section */}
           <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Users className="w-5 h-5 text-cyan-400" />
-              임상병리사 정규 EKG 순환 일정 관리
-            </h3>
-            <p className="text-xs text-slate-400">
-              평일 06:00 ~ 08:00 정규 EKG(P) 호출 시 매칭되는 임상병리사 담당자 기간별 스케줄입니다.
-            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-cyan-400" />
+                  임상병리사 정규 EKG 순환 일정 관리
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  기간(시작일~종료일), 근무 구분(평일/공휴일/매일), 담당 시간대(시작~종료)를 관리자가 직접 조정할 수 있습니다.
+                </p>
+              </div>
+
+              <button
+                onClick={handleAddPathologistSchedule}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                순환 일정 추가
+              </button>
+            </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-800/90 text-slate-300 font-bold">
+                <thead className="bg-slate-800/90 text-slate-300 font-bold uppercase tracking-wider">
                   <tr>
-                    <th className="p-3">기간 (시작일 ~ 종료일)</th>
-                    <th className="p-3">담당 임상병리사</th>
-                    <th className="p-3">연락처 (휴대전화)</th>
-                    <th className="p-3">원내 내선/UCAP</th>
+                    <th className="p-3 min-w-[250px]">기간 (시작일 ~ 종료일)</th>
+                    <th className="p-3 w-32">근무 구분</th>
+                    <th className="p-3 min-w-[170px]">시간대 (시작 ~ 종료)</th>
+                    <th className="p-3 w-28">담당 임상병리사</th>
+                    <th className="p-3 w-36">연락처 (휴대전화)</th>
+                    <th className="p-3 w-28">원내 내선/UCAP</th>
+                    <th className="p-3 w-14 text-center">삭제</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
                   {pathologistSchedules.map((p, idx) => (
-                    <tr key={p.id} className="hover:bg-slate-800/40">
-                      <td className="p-3 text-cyan-300 font-bold">
-                        {p.startDate} ~ {p.endDate}
+                    <tr key={p.id} className="hover:bg-slate-800/40 transition">
+                      {/* 기간 (시작일 ~ 종료일) */}
+                      <td className="p-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="date"
+                            value={p.startDate}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, startDate: val } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                          <span className="text-slate-500 font-bold">~</span>
+                          <input
+                            type="date"
+                            value={p.endDate}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, endDate: val } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
                       </td>
-                      <td className="p-3">
+
+                      {/* 근무 구분 (평일 / 주말·공휴일 / 매일) */}
+                      <td className="p-2.5">
+                        <select
+                          value={p.dayType || 'WEEKDAY'}
+                          onChange={e => {
+                            const val = e.target.value as any;
+                            setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, dayType: val } : item));
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+                        >
+                          <option value="WEEKDAY">평일만 (기본)</option>
+                          <option value="WEEKEND_HOLIDAY">주말/공휴일만</option>
+                          <option value="ALL">매일 (전체)</option>
+                        </select>
+                      </td>
+
+                      {/* 시간대 (시작 시간 ~ 종료 시간) */}
+                      <td className="p-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time"
+                            value={p.startTime || '06:00'}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, startTime: val } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                          <span className="text-slate-500 font-bold">~</span>
+                          <input
+                            type="time"
+                            value={p.endTime || '08:00'}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, endTime: val } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                      </td>
+
+                      {/* 담당 임상병리사 */}
+                      <td className="p-2.5">
                         <input
                           type="text"
                           value={p.name}
+                          placeholder="담당자명"
                           onChange={e => {
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, name: val } : item));
                           }}
-                          className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
                         />
                       </td>
-                      <td className="p-3">
+
+                      {/* 연락처 (휴대전화) */}
+                      <td className="p-2.5">
                         <input
                           type="text"
                           value={p.phone}
+                          placeholder="010-0000-0000"
                           onChange={e => {
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, phone: val } : item));
                           }}
-                          className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                         />
                       </td>
-                      <td className="p-3">
+
+                      {/* 원내 내선/UCAP */}
+                      <td className="p-2.5">
                         <input
                           type="text"
                           value={p.ucap}
+                          placeholder="5-9907"
                           onChange={e => {
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, ucap: val } : item));
                           }}
-                          className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                         />
+                      </td>
+
+                      {/* 삭제 */}
+                      <td className="p-2.5 text-center">
+                        <button
+                          onClick={() => handleDeletePathologistSchedule(p.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                          title="일정 삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}

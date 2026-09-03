@@ -99,9 +99,13 @@ export interface InternDoctor {
 
 export interface PathologistSchedule {
   id: string;
-  startDate: string;
-  endDate: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  dayType: 'WEEKDAY' | 'WEEKEND_HOLIDAY' | 'ALL';
+  startTime: string; // HH:mm (e.g. 06:00)
+  endTime: string;   // HH:mm (e.g. 08:00)
   name: string;
   phone: string;
   ucap: string;
+  notes?: string;
 }
