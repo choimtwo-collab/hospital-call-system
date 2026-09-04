@@ -243,28 +243,8 @@ export const UserView: React.FC<UserViewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 px-2">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
-              3초 퀵 시나리오 & 규칙 빌더 연동:
+              규칙 빌더 바로가기:
             </span>
-
-            {/* 표준 시스템 프리셋 */}
-            <button
-              onClick={() => applyPreset('내과', 'MICU', 'EKG', '07:00')}
-              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-            >
-              🏥 평일 07시 MICU EKG
-            </button>
-            <button
-              onClick={() => applyPreset('내과', '61병동', 'ABGA', '10:00')}
-              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-            >
-              🩸 61병동 정규 ABGA(10시)
-            </button>
-            <button
-              onClick={() => applyPreset('비내과', 'SICU', 'EKG', '23:30')}
-              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-            >
-              🌙 야간 SICU(23:30)
-            </button>
 
             {/* 관리자 규칙 빌더(Custom Rules) 동적 칩 목록 */}
             {activeCustomRules.map(rule => (
@@ -278,6 +258,10 @@ export const UserView: React.FC<UserViewProps> = ({
                 <span>{rule.name}</span>
               </button>
             ))}
+
+            {activeCustomRules.length === 0 && (
+              <span className="text-xs text-slate-500 italic">등록된 활성 규칙이 없습니다.</span>
+            )}
           </div>
 
           {/* 규칙 빌더 세부 목록 토글 버튼 */}
