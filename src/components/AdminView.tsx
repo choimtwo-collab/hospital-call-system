@@ -3,15 +3,17 @@ import {
   Settings, Users, Calendar, Phone, Plus, Trash2, Grid, Clock, 
   RotateCcw, Download, Upload, Save, CheckCircle2, AlertCircle, Search,
   FileSpreadsheet, Sliders, Tag, ArrowRight, Shield, ToggleLeft, ToggleRight,
-  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2
+  HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2,
+  PhoneCall, ShieldCheck, HeartPulse
 } from 'lucide-react';
 import { 
-  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact, areWardsEqual, initialTasks 
+  ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, getCNPostContact, areWardsEqual, initialTasks,
+  emergencyContacts as defaultEmergencyContacts
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
   TaskItem, CustomRule, InternDoctor, PathologistSchedule, TaskCategory, 
-  DutyPhoneItem, CNGroupSchedule, CNShiftCell, SpecialtyType, TimeRuleType 
+  DutyPhoneItem, CNGroupSchedule, CNShiftCell, SpecialtyType, TimeRuleType, EmergencyContact 
 } from '../types';
 import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../utils/excelParser';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
@@ -45,6 +47,8 @@ interface AdminViewProps {
   setDutyPhones: React.Dispatch<React.SetStateAction<DutyPhoneItem[]>>;
   cnGroupSchedules?: CNGroupSchedule[];
   setCnGroupSchedules?: React.Dispatch<React.SetStateAction<CNGroupSchedule[]>>;
+  emergencyContacts?: EmergencyContact[];
+  setEmergencyContacts?: React.Dispatch<React.SetStateAction<EmergencyContact[]>>;
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
@@ -65,10 +69,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
   dutyPhones, setDutyPhones,
   cnGroupSchedules = [],
   setCnGroupSchedules,
+  emergencyContacts = defaultEmergencyContacts,
+  setEmergencyContacts,
   onSyncSheets, isSyncingSheets,
   onResetData
 }) => {
-  const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'data'>('schedules');
+  const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'hotlines' | 'data'>('schedules');
   const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
   const [dutyPhoneDeptFilter, setDutyPhoneDeptFilter] = useState<'ALL' | '내과' | '비내과'>('ALL');
   const [adminCNSubTab, setAdminCNSubTab] = useState<'schedule' | 'wards' | 'timeslot'>('schedule');
@@ -129,6 +135,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [ruleFormDutyPhone, setRuleFormDutyPhone] = useState<string>('');
   const [ruleFormDutyUcap, setRuleFormDutyUcap] = useState<string>('');
   const [ruleFormNotes, setRuleFormNotes] = useState<string>('');
+
+  // 주요 긴급 / 핫라인 관리 상태
+  const [newHotlineDept, setNewHotlineDept] = useState('');
+  const [newHotlineName, setNewHotlineName] = useState('');
+  const [newHotlineUcap, setNewHotlineUcap] = useState('');
+  const [newHotlinePhone, setNewHotlinePhone] = useState('');
+  const [newHotlineCategory, setNewHotlineCategory] = useState<'ER' | 'OR' | 'ICU' | 'LAB' | 'ADMIN'>('ER');
 
   const showSaveSuccess = (msg: string) => {
     setSaveToast(msg);
@@ -659,6 +672,60 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setCustomRules(updated);
   };
 
+  // --- Hotline Handlers ---
+  const handleAddHotline = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newHotlineDept.trim() || !newHotlineName.trim() || !newHotlineUcap.trim()) {
+      alert('소속 부서, 파트명, UCAP 내선번호를 모두 입력해주세요.');
+      return;
+    }
+    const newContact: EmergencyContact = {
+      id: 'emg-' + Date.now(),
+      dept: newHotlineDept.trim(),
+      name: newHotlineName.trim(),
+      ucap: newHotlineUcap.trim(),
+      phone: newHotlinePhone.trim() || '-',
+      category: newHotlineCategory
+    };
+    if (setEmergencyContacts) {
+      setEmergencyContacts(prev => [...prev, newContact]);
+    }
+    setNewHotlineDept('');
+    setNewHotlineName('');
+    setNewHotlineUcap('');
+    setNewHotlinePhone('');
+    showSaveSuccess(`새 핫라인 [${newContact.dept} - ${newContact.name}]이(가) 등록되었습니다.`);
+  };
+
+  const handleDeleteHotline = (id: string, name: string) => {
+    if (confirm(`[${name}] 핫라인을 삭제하시겠습니까? 간호사 메인 화면에서도 즉시 제거됩니다.`)) {
+      if (setEmergencyContacts) {
+        setEmergencyContacts(prev => prev.filter(c => c.id !== id));
+      }
+      showSaveSuccess(`[${name}] 핫라인이 삭제되었습니다.`);
+    }
+  };
+
+  const handleUpdateHotline = (id: string, field: keyof EmergencyContact, value: string) => {
+    if (setEmergencyContacts) {
+      setEmergencyContacts(prev => prev.map(c => {
+        if (c.id === id) {
+          return { ...c, [field]: value };
+        }
+        return c;
+      }));
+    }
+  };
+
+  const handleResetHotlines = () => {
+    if (confirm('모든 주요 핫라인 다이얼 목록을 시스템 표준 기본값으로 초기화하시겠습니까?')) {
+      if (setEmergencyContacts) {
+        setEmergencyContacts(defaultEmergencyContacts);
+      }
+      showSaveSuccess('주요 핫라인이 표준 기본값으로 초기화되었습니다.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -745,6 +812,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
         >
           <Clock className="w-4 h-4" />
           공통전담간호 근무 매트릭스
+        </button>
+
+        <button
+          onClick={() => setAdminTab('hotlines')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+            adminTab === 'hotlines'
+              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-black'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          주요 핫라인 관리 ({emergencyContacts.length})
         </button>
 
         <button
@@ -3581,6 +3660,270 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             );
           })()}
+
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* TAB 5.5: EMERGENCY HOTLINES MANAGEMENT                                */}
+      {/* ==================================================================== */}
+      {adminTab === 'hotlines' && (
+        <div className="space-y-6">
+          
+          {/* Header Card */}
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                주요 긴급 / 야간 파트 핫라인 다이얼 설정
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                간호사 메인 뷰 하단에 상시 노출되는 주요 긴급/야간 핫라인 번호를 직접 등록, 수정 및 삭제 관리합니다.
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={handleResetHotlines}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                표준 기본값 복원
+              </button>
+            </div>
+          </div>
+
+          {/* Live Preview Card (Matches User View) */}
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-cyan-500/30 bg-slate-900/80 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <h4 className="text-xs sm:text-sm font-extrabold text-cyan-300 tracking-wider">
+                  간호사 메인 뷰 실시간 노출 미리보기
+                </h4>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
+                총 {emergencyContacts.length}개 핫라인 활성화
+              </span>
+            </div>
+
+            <div className="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800">
+              <div className="flex items-center gap-2 mb-4 text-xs font-bold text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <span>주요 긴급 / 야간 파트 핫라인 다이얼</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {emergencyContacts.map((contact) => (
+                  <div 
+                    key={contact.id} 
+                    className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-cyan-500/40 transition flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-medium text-slate-400">{contact.dept}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-800 text-cyan-400 border border-slate-700/60">
+                          {contact.category}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-white group-hover:text-cyan-200 transition">
+                        {contact.name}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800/60">
+                      <div className="text-xs font-mono font-bold text-cyan-400 flex items-center gap-1">
+                        <PhoneCall className="w-3 h-3" />
+                        {contact.ucap}
+                      </div>
+                      {contact.phone && contact.phone !== '-' && (
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {contact.phone}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* New Hotline Form */}
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
+            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Plus className="w-4 h-4 text-cyan-400" />
+              신규 핫라인 번호 등록
+            </h4>
+            <form onSubmit={handleAddHotline} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">부서 / 소속 *</label>
+                <input
+                  type="text"
+                  placeholder="예: 응급실, 중환자실, 약제팀"
+                  value={newHotlineDept}
+                  onChange={(e) => setNewHotlineDept(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">핫라인 명칭 (파트명) *</label>
+                <input
+                  type="text"
+                  placeholder="예: 응급의학과 메인, 외과중환자실(SICU)"
+                  value={newHotlineName}
+                  onChange={(e) => setNewHotlineName(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">UCAP 내선번호 *</label>
+                <input
+                  type="text"
+                  placeholder="예: UCAP 5-1119"
+                  value={newHotlineUcap}
+                  onChange={(e) => setNewHotlineUcap(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-cyan-300 font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">비상 휴대전화</label>
+                <input
+                  type="text"
+                  placeholder="예: 010-XXXX-XXXX (선택)"
+                  value={newHotlinePhone}
+                  onChange={(e) => setNewHotlinePhone(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">카테고리</label>
+                <select
+                  value={newHotlineCategory}
+                  onChange={(e) => setNewHotlineCategory(e.target.value as any)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="ER">응급 (ER)</option>
+                  <option value="ICU">중환자실 (ICU)</option>
+                  <option value="OR">수술실 (OR)</option>
+                  <option value="LAB">검사/지원 (LAB)</option>
+                  <option value="ADMIN">원무/관리 (ADMIN)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-6 flex justify-end mt-1">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition transform active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  핫라인 추가 등록
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Hotlines Management Table */}
+          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <PhoneCall className="w-4 h-4 text-cyan-400" />
+                  등록된 핫라인 목록 및 실시간 편집 ({emergencyContacts.length}개)
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  아래 항목의 값을 직접 수정하면 간호사 뷰에 실시간으로 즉시 반영됩니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-950/80 text-[11px] font-bold text-slate-400 border-b border-slate-800">
+                    <th className="py-3 px-4 w-12 text-center">번호</th>
+                    <th className="py-3 px-4 w-32">분류</th>
+                    <th className="py-3 px-4 w-36">부서 / 소속</th>
+                    <th className="py-3 px-4">파트명 (표시 이름)</th>
+                    <th className="py-3 px-4 w-44">UCAP 내선번호</th>
+                    <th className="py-3 px-4 w-44">비상 휴대전화</th>
+                    <th className="py-3 px-4 w-20 text-center">삭제</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {emergencyContacts.map((contact, index) => (
+                    <tr key={contact.id} className="hover:bg-slate-850/50 transition">
+                      <td className="py-3 px-4 text-center font-mono text-slate-500 text-[11px]">
+                        {index + 1}
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={contact.category}
+                          onChange={(e) => handleUpdateHotline(contact.id, 'category', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2 py-1.5 text-xs text-cyan-300 font-medium focus:outline-none focus:border-cyan-500 w-full"
+                        >
+                          <option value="ER">응급 (ER)</option>
+                          <option value="ICU">중환자 (ICU)</option>
+                          <option value="OR">수술실 (OR)</option>
+                          <option value="LAB">검사/약제 (LAB)</option>
+                          <option value="ADMIN">행정/관리 (ADMIN)</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={contact.dept}
+                          onChange={(e) => handleUpdateHotline(contact.id, 'dept', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-cyan-500 w-full"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={contact.name}
+                          onChange={(e) => handleUpdateHotline(contact.id, 'name', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-cyan-500 w-full"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={contact.ucap}
+                          onChange={(e) => handleUpdateHotline(contact.id, 'ucap', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-500 w-full"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={contact.phone === '-' ? '' : contact.phone}
+                          placeholder="-"
+                          onChange={(e) => handleUpdateHotline(contact.id, 'phone', e.target.value || '-')}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-cyan-500 w-full"
+                        />
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => handleDeleteHotline(contact.id, contact.name)}
+                          title="핫라인 삭제"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {emergencyContacts.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-slate-500 text-xs">
+                        등록된 주요 핫라인이 없습니다. 위의 등록 폼에서 새로운 번호를 추가하거나 상단의 [표준 기본값 복원]을 눌러주세요.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
         </div>
       )}

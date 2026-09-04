@@ -6,12 +6,12 @@ import {
   Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen
 } from 'lucide-react';
 import { 
-  DEPARTMENTS, DepartmentType, WARD_OPTIONS, emergencyContacts 
+  DEPARTMENTS, DepartmentType, WARD_OPTIONS, emergencyContacts as defaultEmergencyContacts 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
   SearchResult, TaskItem, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule,
-  InternDoctor 
+  InternDoctor, EmergencyContact 
 } from '../types';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
@@ -29,6 +29,7 @@ interface UserViewProps {
   dutyPhones?: DutyPhoneItem[];
   cnGroupSchedules?: CNGroupSchedule[];
   interns?: InternDoctor[];
+  emergencyContacts?: EmergencyContact[];
   sheetsConfig: GoogleSheetsConfig;
   onSyncSheets: () => void;
   isSyncingSheets: boolean;
@@ -48,6 +49,7 @@ export const UserView: React.FC<UserViewProps> = ({
   dutyPhones = [],
   cnGroupSchedules = [],
   interns = [],
+  emergencyContacts = defaultEmergencyContacts,
   sheetsConfig,
   onSyncSheets,
   isSyncingSheets
