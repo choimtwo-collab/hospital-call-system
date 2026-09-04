@@ -1,6 +1,6 @@
 import { 
   DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS, getCNPostContact, areWardsEqual,
-  initialInternWardGroups 
+  initialInternWardGroups, getRelatedRoleKeys 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
@@ -11,44 +11,69 @@ import { checkKoreanHoliday } from './koreanHolidays';
 
 /**
  * 당직표에서 역할별 의사 이름을 검색합니다. ('내과 1', '내과1 (인턴1)', '비내과 1' 등 별칭 자동 처리)
+ * 관리자 화면 캘린더/그리드에서 직접 편집한 표준 키('내과 1', '비내과 1' 등)를 최우선으로 반영합니다.
  */
 export function getScheduleDoctor(schedule: Record<string, string> | undefined, roleKey: string): string {
   if (!schedule) return '';
-  if (schedule[roleKey]) return schedule[roleKey];
 
   const cleanKey = roleKey.replace(/\s+/g, '').toLowerCase();
-
-  // 1. Exact match after cleaning whitespace & lowercasing
-  for (const [k, v] of Object.entries(schedule)) {
-    if (!v) continue;
-    const cleanK = k.replace(/\s+/g, '').toLowerCase();
-    if (cleanK === cleanKey) return v;
-  }
-
-  // 2. Distinguish 내과 from 비내과
   const isNonIm = cleanKey.includes('비내과') || cleanKey.includes('non');
   const isIm = !isNonIm && (cleanKey.includes('내과') || cleanKey.includes('im'));
 
+  // 1. 관리자 화면 캘린더 뷰에서 주로 편집하는 표준 키 우선 탐색
+  if (isIm) {
+    if (cleanKey.includes('1') || cleanKey.includes('인턴1')) {
+      const v = schedule['내과 1'] ?? schedule['내과1'] ?? schedule[ROLES.IM_1];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    } else if (cleanKey.includes('2') || cleanKey.includes('인턴2')) {
+      const v = schedule['내과 2'] ?? schedule['내과2'] ?? schedule[ROLES.IM_2];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    }
+  }
+
+  if (isNonIm) {
+    if (cleanKey.includes('1') || cleanKey.includes('당직인턴1')) {
+      const v = schedule['비내과 1'] ?? schedule['비내과1'] ?? schedule[ROLES.NON_IM_1];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    } else if (cleanKey.includes('2') || cleanKey.includes('당직인턴2')) {
+      const v = schedule['비내과 2'] ?? schedule['비내과2'] ?? schedule[ROLES.NON_IM_2];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    } else if (cleanKey.includes('3') || cleanKey.includes('당직인턴3')) {
+      const v = schedule['비내과 3'] ?? schedule['비내과3'] ?? schedule[ROLES.NON_IM_3];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    }
+  }
+
+  // 2. Exact match
+  if (schedule[roleKey] && schedule[roleKey].trim()) return schedule[roleKey].trim();
+
+  // 3. Fallback: 루프를 돌며 cleanKey 매칭
   for (const [k, v] of Object.entries(schedule)) {
-    if (!v) continue;
+    if (!v || !v.trim()) continue;
+    const cleanK = k.replace(/\s+/g, '').toLowerCase();
+    if (cleanK === cleanKey) return v.trim();
+  }
+
+  for (const [k, v] of Object.entries(schedule)) {
+    if (!v || !v.trim()) continue;
     const cleanK = k.replace(/\s+/g, '').toLowerCase();
     const kIsNonIm = cleanK.includes('비내과') || cleanK.includes('non');
     const kIsIm = !kIsNonIm && (cleanK.includes('내과') || cleanK.includes('im'));
 
     if (isIm && kIsIm) {
-      if ((cleanKey.includes('1') || cleanKey.includes('인턴1')) && (cleanK.includes('1') || cleanK.includes('인턴1'))) return v;
-      if ((cleanKey.includes('2') || cleanKey.includes('인턴2')) && (cleanK.includes('2') || cleanK.includes('인턴2'))) return v;
+      if ((cleanKey.includes('1') || cleanKey.includes('인턴1')) && (cleanK.includes('1') || cleanK.includes('인턴1'))) return v.trim();
+      if ((cleanKey.includes('2') || cleanKey.includes('인턴2')) && (cleanK.includes('2') || cleanK.includes('인턴2'))) return v.trim();
     }
 
     if (isNonIm && kIsNonIm) {
-      if ((cleanKey.includes('1') || cleanKey.includes('당직인턴1')) && (cleanK.includes('1') || cleanK.includes('당직인턴1'))) return v;
-      if ((cleanKey.includes('2') || cleanKey.includes('당직인턴2')) && (cleanK.includes('2') || cleanK.includes('당직인턴2'))) return v;
-      if ((cleanKey.includes('3') || cleanKey.includes('당직인턴3')) && (cleanK.includes('3') || cleanK.includes('당직인턴3'))) return v;
+      if ((cleanKey.includes('1') || cleanKey.includes('당직인턴1')) && (cleanK.includes('1') || cleanK.includes('당직인턴1'))) return v.trim();
+      if ((cleanKey.includes('2') || cleanKey.includes('당직인턴2')) && (cleanK.includes('2') || cleanK.includes('당직인턴2'))) return v.trim();
+      if ((cleanKey.includes('3') || cleanKey.includes('당직인턴3')) && (cleanK.includes('3') || cleanK.includes('당직인턴3'))) return v.trim();
     }
 
     if ((cleanKey.includes('연차') || cleanKey.includes('휴가') || cleanKey.includes('off')) &&
         (cleanK.includes('연차') || cleanK.includes('휴가') || cleanK.includes('off'))) {
-      return v;
+      return v.trim();
     }
   }
 

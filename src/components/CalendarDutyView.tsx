@@ -203,8 +203,13 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
           </button>
         </div>
 
-        {/* Division Settings Button */}
-        <div className="flex items-center gap-2">
+        {/* Division Settings Button & Live Sync Badge */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            수정 즉시 간호사 화면 & DB 자동 반영
+          </span>
+
           <button
             onClick={() => setIsRoleManagerOpen(prev => !prev)}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition ${

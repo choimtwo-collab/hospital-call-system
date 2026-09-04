@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { 
   ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, WARD_OPTIONS, getCNPostContact, areWardsEqual, initialTasks,
-  emergencyContacts as defaultEmergencyContacts, initialInternWardGroups
+  emergencyContacts as defaultEmergencyContacts, initialInternWardGroups, getRelatedRoleKeys
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
@@ -205,10 +205,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   // --- Schedule Handlers ---
   const handleScheduleChange = (date: string, role: string, value: string) => {
-    setSchedules(prev => ({
-      ...prev,
-      [date]: { ...prev[date], [role]: value }
-    }));
+    const relatedKeys = getRelatedRoleKeys(role);
+    setSchedules(prev => {
+      const prevDateSchedule = prev[date] || {};
+      const newDateSchedule = { ...prevDateSchedule };
+
+      // 사용자가 수정한 역할명과 연관된 모든 표준/별칭 키(예: '내과 1', '내과1', '내과1 (인턴1)')를 동일한 값으로 동시 갱신!
+      relatedKeys.forEach(k => {
+        newDateSchedule[k] = value;
+      });
+
+      return {
+        ...prev,
+        [date]: newDateSchedule
+      };
+    });
   };
 
   const handleAddDate = () => {

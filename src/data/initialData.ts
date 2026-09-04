@@ -21,6 +21,51 @@ export const ROLES = {
   INTERN: '해당과 인턴'
 };
 
+/**
+ * 주어진 당직 역할명(예: '내과 1', '내과1', '내과1 (인턴1)')과 연관된 모든 표준/별칭 키 목록을 반환합니다.
+ */
+export function getRelatedRoleKeys(role: string): string[] {
+  if (!role) return [];
+  const clean = role.replace(/\s+/g, '').toLowerCase();
+  const keys = new Set<string>([role.trim()]);
+
+  if (clean.includes('비내과') || clean.includes('non')) {
+    if (clean.includes('1') || clean.includes('당직인턴1') || clean.includes('인턴1')) {
+      keys.add(ROLES.NON_IM_1); // '비내과1 (당직인턴1)'
+      keys.add('비내과 1');
+      keys.add('비내과1');
+      keys.add('당직인턴1');
+    } else if (clean.includes('2') || clean.includes('당직인턴2') || clean.includes('인턴2')) {
+      keys.add(ROLES.NON_IM_2); // '비내과2 (당직인턴2)'
+      keys.add('비내과 2');
+      keys.add('비내과2');
+      keys.add('당직인턴2');
+    } else if (clean.includes('3') || clean.includes('당직인턴3') || clean.includes('인턴3')) {
+      keys.add(ROLES.NON_IM_3); // '비내과3 (당직인턴3)'
+      keys.add('비내과 3');
+      keys.add('비내과3');
+      keys.add('당직인턴3');
+    }
+  } else if (clean.includes('내과') || clean.includes('im')) {
+    if (clean.includes('1') || clean.includes('인턴1')) {
+      keys.add(ROLES.IM_1); // '내과1 (인턴1)'
+      keys.add('내과 1');
+      keys.add('내과1');
+      keys.add('인턴1');
+    } else if (clean.includes('2') || clean.includes('인턴2')) {
+      keys.add(ROLES.IM_2); // '내과2 (인턴2)'
+      keys.add('내과 2');
+      keys.add('내과2');
+      keys.add('인턴2');
+    }
+  } else if (clean.includes('연차') || clean.includes('휴가') || clean.includes('off')) {
+    keys.add('연차');
+    keys.add('휴가');
+  }
+
+  return Array.from(keys);
+}
+
 export const DUTY_PHONES: Record<string, string> = {
   [ROLES.NON_IM_1]: '010-7628-5803',
   [ROLES.NON_IM_2]: '010-7624-5803',
