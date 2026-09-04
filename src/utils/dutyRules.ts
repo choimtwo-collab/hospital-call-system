@@ -97,14 +97,19 @@ export function evaluateDutyRules(
   let ruleSource: 'DYNAMIC_RULE' | 'SYSTEM_DEFAULT' = 'SYSTEM_DEFAULT';
   let matchedRuleName: string | undefined = undefined;
 
-  const isTask = (keyword: string) => selectedTask.toLowerCase().includes(keyword.toLowerCase());
+  const cleanTask = selectedTask.replace(/\s+/g, '').toLowerCase();
+  const isTask = (keyword: string) => cleanTask.includes(keyword.replace(/\s+/g, '').toLowerCase());
 
   // 업무 마스터(Task Master) 매칭
-  const matchedTaskItem = tasks.find(t => 
-    t.name === selectedTask || 
-    t.name.replace(/\n/g, ' ') === selectedTask.replace(/\n/g, ' ') ||
-    selectedTask.toLowerCase().includes(t.name.split(' (')[0].toLowerCase())
-  );
+  const cleanSelectedTask = selectedTask.replace(/\s+/g, '').toLowerCase();
+  const matchedTaskItem = tasks.find(t => {
+    const cleanName = t.name.replace(/\s+/g, '').toLowerCase();
+    const cleanNameBase = t.name.split('(')[0].replace(/\s+/g, '').toLowerCase();
+    return cleanName === cleanSelectedTask || 
+      cleanSelectedTask.includes(cleanName) || 
+      cleanName.includes(cleanSelectedTask) ||
+      (cleanNameBase && cleanSelectedTask.includes(cleanNameBase));
+  });
 
   // 병동 그룹군 분류
   let matchedWardGroup = '';
@@ -153,18 +158,18 @@ export function evaluateDutyRules(
 
     // 5. 업무 키워드 조건 검사
     if (cond.taskKeywords && cond.taskKeywords.length > 0) {
-      const matchTask = cond.taskKeywords.some(kw => isTask(kw));
-      if (!matchTask) continue;
+      const matchKeyword = cond.taskKeywords.some(k => isTask(k));
+      if (!matchKeyword) continue;
     }
 
-    // 조건 모두 충족: 동적 규칙 적용 (관리자가 지정한 연락처/내선 반영)
+    // 조건 일치: 규칙 액션 실행 (관리자 규칙 최우선 강제 적용)
     assignedRole = rule.action.assignedRole;
+    notes = `[규칙 빌더: ${rule.name}] ${rule.action.notes || ''}`;
     backupRole = rule.action.backupRole || '';
-    notes = rule.action.notes || '';
     if (rule.action.dutyPhone) dutyPhone = rule.action.dutyPhone;
     if (rule.action.dutyUcap) dutyUcap = rule.action.dutyUcap;
-    matchedRuleName = rule.name;
     ruleSource = 'DYNAMIC_RULE';
+    matchedRuleName = rule.name;
     break;
   }
 
@@ -206,8 +211,19 @@ export function evaluateDutyRules(
     // 규칙 1: 내과계 (Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else if (selectedDept === '내과') {
+      // 0. 수혈 동의서 (상시 인턴 전담 - 전담간호사 지원 불가)
+      if (isTask('수혈')) {
+        const isGroupB = WARD_GROUPS.GROUP_B.includes(selectedWard);
+        if (!isRegularHours && isGroupB) {
+          assignedRole = ROLES.IM_2;
+          notes = '내과계 병동 Group 2 야간/주말 수혈 동의서는 내과 당직인턴 2 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).';
+        } else {
+          assignedRole = ROLES.IM_1;
+          notes = `${isRegularHours ? '평일 정규시간' : '야간/주말'} 병동 수혈 동의서는 내과 인턴(내과1) 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+        }
+      }
       // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
-      if (
+      else if (
         isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초') ||
         isTask('Foley') || isTask('Nelaton') || isTask('도뇨') ||
         isTask('배액관') || isTask('카테터 관리') || isTask('Chemoport') ||
@@ -233,7 +249,7 @@ export function evaluateDutyRules(
       }
       else if (isRegularHours) {
         // 평일 정규시간 (08:00 ~ 17:00)
-        if (isTask('그외 술기') || isTask('동의서')) {
+        if (isTask('그외 술기') || (isTask('동의서') && !isTask('수혈') && !isTask('마취'))) {
           assignedRole = ROLES.COMMON_NURSE;
           notes = '평일 정규시간 내과계 일반 술기 및 동의서는 공통 전담간호사가 지원합니다.';
         } else if (isTask('Primary Call')) {
@@ -327,8 +343,25 @@ export function evaluateDutyRules(
     // 규칙 2: 비내과계 (Non-Internal Medicine) 매칭 로직
     // -----------------------------------------------------------------------
     else {
+      // 0. 수혈 동의서 (상시 비내과 당직인턴 전담 - 전담간호사 지원 불가)
+      if (isTask('수혈')) {
+        const isGroupC = WARD_GROUPS.GROUP_C.includes(selectedWard);
+        if (isGroupC) {
+          assignedRole = ROLES.NON_IM_2;
+          backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-3499)';
+          dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
+          dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
+          notes = '비내과계 병동 Group C(SICU, 42, 61, 62 등) 수혈 동의서는 비내과 당직인턴 2(5-4081) 담당입니다 (전담간호사 지원 불가).';
+        } else {
+          assignedRole = ROLES.NON_IM_3;
+          backupRole = '1순위: 비내과1 (5-4080)';
+          dutyPhone = DUTY_PHONES[ROLES.NON_IM_3];
+          dutyUcap = DUTY_UCAPS[ROLES.NON_IM_3];
+          notes = '비내과계 병동 Group D(71~121) 수혈 동의서는 비내과 당직인턴 3(5-3499) 담당입니다 (전담간호사 지원 불가).';
+        }
+      }
       // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
-      if (
+      else if (
         isTask('Peripheral') || isTask('일반 정맥 채혈') || isTask('말초') ||
         isTask('Foley') || isTask('Nelaton') || isTask('도뇨') ||
         isTask('배액관') || isTask('카테터 관리') || isTask('Chemoport') ||
@@ -372,7 +405,7 @@ export function evaluateDutyRules(
       } else if (isRegularHours && (isTask('T-tube') || isTask('기관절개관'))) {
         assignedRole = ROLES.INTERN;
         notes = '평일 정규시간 T-tube 교체는 해당 진료과 인턴 담당입니다.';
-      } else if (isTask('그외 술기') || isTask('동의서')) {
+      } else if (isTask('그외 술기') || (isTask('동의서') && !isTask('수혈') && !isTask('마취'))) {
         assignedRole = ROLES.COMMON_NURSE;
         notes = '비내과 일반 술기 및 동의서는 공통 전담간호사가 지원합니다.';
       } else {
@@ -402,6 +435,26 @@ export function evaluateDutyRules(
           assignedRole = ROLES.NON_IM_2;
           backupRole = '비내과1 (5-4080)';
         }
+      }
+    }
+  }
+
+  // =========================================================================
+  // 업무마스터(Task Master) 전담지원 여부(isNurseSupport === 'N') 안전 가드
+  // 전담간호사 지원 불가 업무는 절대 공통/당직 전담간호사로 배정되지 않도록 강제 라우팅
+  // =========================================================================
+  if (matchedTaskItem && (matchedTaskItem.isNurseSupport === 'N' || matchedTaskItem.isNurseSupport === false)) {
+    if (assignedRole === ROLES.COMMON_NURSE || assignedRole === ROLES.DUTY_NURSE) {
+      if (selectedDept === '내과') {
+        const isGroupB = WARD_GROUPS.GROUP_B.includes(selectedWard);
+        assignedRole = (!isRegularHours && isGroupB) ? ROLES.IM_2 : ROLES.IM_1;
+        notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 내과 ${assignedRole === ROLES.IM_2 ? '당직인턴 2' : '당직인턴 1'}로 연결됩니다.`;
+      } else {
+        const isGroupC = WARD_GROUPS.GROUP_C.includes(selectedWard);
+        assignedRole = isGroupC ? ROLES.NON_IM_2 : ROLES.NON_IM_3;
+        dutyPhone = DUTY_PHONES[assignedRole];
+        dutyUcap = DUTY_UCAPS[assignedRole];
+        notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 비내과 당직인턴(${assignedRole})으로 연결됩니다.`;
       }
     }
   }

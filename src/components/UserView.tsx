@@ -81,16 +81,12 @@ export const UserView: React.FC<UserViewProps> = ({
     });
   }, [tasks, selectedDept, taskSearchQuery]);
 
-  // Set default task when department changes
+  // Set default task when department changes or search query filters out current task
   useEffect(() => {
-    const defaultTaskForDept = tasks.find(t => {
-      const taskDept = t.dept || (t.specialtyType === '내과계' ? '내과' : (t.specialtyType === '비내과계' ? '비내과' : 'ALL'));
-      return taskDept === selectedDept || taskDept === 'ALL' || t.specialtyType === '공통';
-    });
-    if (defaultTaskForDept) {
-      setSelectedTask(defaultTaskForDept.name);
+    if (availableTasks.length > 0 && !availableTasks.some(t => t.name === selectedTask)) {
+      setSelectedTask(availableTasks[0].name);
     }
-  }, [selectedDept, tasks]);
+  }, [availableTasks, selectedTask]);
 
   // Recalculate rules on any input change
   useEffect(() => {
