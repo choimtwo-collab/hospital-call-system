@@ -164,14 +164,33 @@ export function evaluateDutyRules(
     if (cond.timeCategory === 'EVENING_17_22' && !isEveningHours) continue;
     if (cond.timeCategory === 'MORNING_06_08' && !(timeDecimal >= 6 && timeDecimal < 8)) continue;
 
-    // 4. 병동 조건 검사
+    // 4. 병동 조건 검사 (dynamic group support)
     if (cond.specificWards && cond.specificWards.length > 0 && !cond.specificWards.includes(selectedWard)) {
       continue;
     }
-    if (cond.wardGroup === 'GROUP_A' && !WARD_GROUPS.GROUP_A.includes(selectedWard)) continue;
-    if (cond.wardGroup === 'GROUP_B' && !WARD_GROUPS.GROUP_B.includes(selectedWard)) continue;
-    if (cond.wardGroup === 'GROUP_C' && !WARD_GROUPS.GROUP_C.includes(selectedWard)) continue;
-    if (cond.wardGroup === 'GROUP_D' && !WARD_GROUPS.GROUP_D.includes(selectedWard)) continue;
+    // Dynamic ward group matching: allow rule to refer to intern ward group IDs or titles
+    if (cond.wardGroup) {
+      // Check against static groups first
+      const staticMatch = (
+        (cond.wardGroup === 'GROUP_A' && WARD_GROUPS.GROUP_A.includes(selectedWard)) ||
+        (cond.wardGroup === 'GROUP_B' && WARD_GROUPS.GROUP_B.includes(selectedWard)) ||
+        (cond.wardGroup === 'GROUP_C' && WARD_GROUPS.GROUP_C.includes(selectedWard)) ||
+        (cond.wardGroup === 'GROUP_D' && WARD_GROUPS.GROUP_D.includes(selectedWard))
+      );
+      if (staticMatch) {
+        // matched static group, proceed
+      } else {
+        // Attempt to match against dynamic intern ward groups
+        const dynGroup = (internWardGroups && internWardGroups.length > 0)
+          ? internWardGroups.find(g => g.id === cond.wardGroup || g.title === cond.wardGroup)
+          : null;
+        if (!dynGroup || !dynGroup.wards.some(w => areWardsEqual(w, selectedWard))) {
+          continue; // no matching group
+        }
+      }
+    }
+    // If no wardGroup condition, fall through to next checks (none needed)
+    // Note: existing static checks removed as they are covered above
 
     // 5. 업무 키워드 조건 검사
     if (cond.taskKeywords && cond.taskKeywords.length > 0) {
