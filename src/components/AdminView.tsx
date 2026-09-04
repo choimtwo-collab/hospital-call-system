@@ -129,8 +129,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // 업무 마스터 편집 모달 상태
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
-  // 규칙 빌더 신규 추가 모달/상태
+  // 규칙 빌더 신규 추가/수정 모달 상태
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleFormName, setRuleFormName] = useState('');
   const [ruleFormDept, setRuleFormDept] = useState<'내과' | '비내과' | 'ALL'>('ALL');
   const [ruleFormWardGroup, setRuleFormWardGroup] = useState<string>('ALL');
@@ -616,43 +617,99 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   // --- Rule Builder Handlers ---
-  const handleCreateRule = () => {
+  const handleOpenCreateRuleModal = () => {
+    setEditingRuleId(null);
+    setRuleFormName('');
+    setRuleFormDept('ALL');
+    setRuleFormWardGroup('ALL');
+    setRuleFormTaskKeyword('');
+    setRuleFormTimeCategory('ALL');
+    setRuleFormDayCategory('ALL');
+    setRuleFormAssignedRole(ROLES.NON_IM_1);
+    setRuleFormBackupRole('');
+    setRuleFormDutyPhone('');
+    setRuleFormDutyUcap('');
+    setRuleFormNotes('');
+    setIsRuleModalOpen(true);
+  };
+
+  const handleOpenEditRuleModal = (rule: CustomRule) => {
+    setEditingRuleId(rule.id);
+    setRuleFormName(rule.name);
+    setRuleFormDept(rule.condition.department || 'ALL');
+    setRuleFormWardGroup(rule.condition.wardGroup || 'ALL');
+    setRuleFormTaskKeyword(rule.condition.taskKeywords?.[0] || '');
+    setRuleFormTimeCategory((rule.condition.timeCategory as any) || 'ALL');
+    setRuleFormDayCategory((rule.condition.dayCategory as any) || 'ALL');
+    setRuleFormAssignedRole(rule.action.assignedRole);
+    setRuleFormBackupRole(rule.action.backupRole || '');
+    setRuleFormDutyPhone(rule.action.dutyPhone || '');
+    setRuleFormDutyUcap(rule.action.dutyUcap || '');
+    setRuleFormNotes(rule.action.notes || '');
+    setIsRuleModalOpen(true);
+  };
+
+  const handleSaveRule = () => {
     if (!ruleFormName.trim()) {
       alert('규칙 이름을 입력해주세요.');
       return;
     }
 
-    const newRule: CustomRule = {
-      id: `rule-${Date.now()}`,
-      name: ruleFormName.trim(),
-      enabled: true,
-      priority: customRules.length + 1,
-      condition: {
-        department: ruleFormDept,
-        wardGroup: ruleFormWardGroup === 'ALL' ? undefined : ruleFormWardGroup,
-        taskKeywords: ruleFormTaskKeyword.trim() ? [ruleFormTaskKeyword.trim()] : undefined,
-        timeCategory: ruleFormTimeCategory === 'ALL' ? undefined : (ruleFormTimeCategory as any),
-        dayCategory: ruleFormDayCategory === 'ALL' ? undefined : (ruleFormDayCategory as any)
-      },
-      action: {
-        assignedRole: ruleFormAssignedRole,
-        backupRole: ruleFormBackupRole.trim() || undefined,
-        dutyPhone: ruleFormDutyPhone.trim() || undefined,
-        dutyUcap: ruleFormDutyUcap.trim() || undefined,
-        notes: ruleFormNotes.trim() || undefined
-      }
-    };
+    if (editingRuleId) {
+      // 규칙 수정
+      setCustomRules(prev => prev.map(r => {
+        if (r.id !== editingRuleId) return r;
+        return {
+          ...r,
+          name: ruleFormName.trim(),
+          condition: {
+            ...r.condition,
+            department: ruleFormDept,
+            wardGroup: ruleFormWardGroup === 'ALL' ? undefined : ruleFormWardGroup,
+            taskKeywords: ruleFormTaskKeyword.trim() ? [ruleFormTaskKeyword.trim()] : undefined,
+            timeCategory: ruleFormTimeCategory === 'ALL' ? undefined : (ruleFormTimeCategory as any),
+            dayCategory: ruleFormDayCategory === 'ALL' ? undefined : (ruleFormDayCategory as any)
+          },
+          action: {
+            ...r.action,
+            assignedRole: ruleFormAssignedRole,
+            backupRole: ruleFormBackupRole.trim() || undefined,
+            dutyPhone: ruleFormDutyPhone.trim() || undefined,
+            dutyUcap: ruleFormDutyUcap.trim() || undefined,
+            notes: ruleFormNotes.trim() || undefined
+          }
+        };
+      }));
+      setIsRuleModalOpen(false);
+      setEditingRuleId(null);
+      showSaveSuccess('규칙이 성공적으로 수정되어 실시간 저장되었습니다.');
+    } else {
+      // 새 규칙 생성
+      const newRule: CustomRule = {
+        id: `rule-${Date.now()}`,
+        name: ruleFormName.trim(),
+        enabled: true,
+        priority: customRules.length + 1,
+        condition: {
+          department: ruleFormDept,
+          wardGroup: ruleFormWardGroup === 'ALL' ? undefined : ruleFormWardGroup,
+          taskKeywords: ruleFormTaskKeyword.trim() ? [ruleFormTaskKeyword.trim()] : undefined,
+          timeCategory: ruleFormTimeCategory === 'ALL' ? undefined : (ruleFormTimeCategory as any),
+          dayCategory: ruleFormDayCategory === 'ALL' ? undefined : (ruleFormDayCategory as any)
+        },
+        action: {
+          assignedRole: ruleFormAssignedRole,
+          backupRole: ruleFormBackupRole.trim() || undefined,
+          dutyPhone: ruleFormDutyPhone.trim() || undefined,
+          dutyUcap: ruleFormDutyUcap.trim() || undefined,
+          notes: ruleFormNotes.trim() || undefined
+        }
+      };
 
-    setCustomRules(prev => [...prev, newRule]);
-    setIsRuleModalOpen(false);
-    // Reset Form
-    setRuleFormName('');
-    setRuleFormTaskKeyword('');
-    setRuleFormBackupRole('');
-    setRuleFormDutyPhone('');
-    setRuleFormDutyUcap('');
-    setRuleFormNotes('');
-    showSaveSuccess('새로운 동적 매칭 규칙이 생성되었습니다.');
+      setCustomRules(prev => [...prev, newRule]);
+      setIsRuleModalOpen(false);
+      showSaveSuccess('새로운 동적 매칭 규칙이 생성되었습니다.');
+    }
   };
 
   const handleToggleRule = (id: string) => {
@@ -2366,7 +2423,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
 
               <button
-                onClick={() => setIsRuleModalOpen(true)}
+                onClick={handleOpenCreateRuleModal}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 transition"
               >
                 <Plus className="w-4 h-4" />
@@ -2419,6 +2476,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       title="우선순위 내리기"
                     >
                       ▼
+                    </button>
+                    <button
+                      onClick={() => handleOpenEditRuleModal(rule)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 transition"
+                      title="규칙 수정"
+                    >
+                      <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleToggleRule(rule.id)}
@@ -2504,7 +2568,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                     <Sliders className="w-5 h-5 text-amber-400" />
-                    새로운 If-Then 매칭 규칙 정의
+                    {editingRuleId ? 'If-Then 매칭 규칙 수정' : '새로운 If-Then 매칭 규칙 정의'}
                   </h3>
                   <button onClick={() => setIsRuleModalOpen(false)} className="text-slate-400 hover:text-white">
                     <X className="w-5 h-5" />
@@ -2673,10 +2737,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     취소
                   </button>
                   <button
-                    onClick={handleCreateRule}
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20"
+                    onClick={handleSaveRule}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/20 transition"
                   >
-                    규칙 추가 및 활성화
+                    {editingRuleId ? '규칙 수정 완료' : '규칙 추가 및 활성화'}
                   </button>
                 </div>
               </div>

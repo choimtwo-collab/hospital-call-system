@@ -3,7 +3,7 @@ import {
   Calendar, Clock, Phone, PhoneCall, ShieldAlert, CheckCircle2, 
   Building2, FileText, Zap, ChevronRight, AlertTriangle, ExternalLink, 
   RefreshCw, Bookmark, BookmarkCheck, Search, Copy, Check, MessageSquare,
-  Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen
+  Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen, Sliders
 } from 'lucide-react';
 import { 
   DEPARTMENTS, DepartmentType, WARD_OPTIONS, emergencyContacts as defaultEmergencyContacts 
@@ -148,6 +148,62 @@ export const UserView: React.FC<UserViewProps> = ({
     if (targetTask) setSelectedTask(targetTask.name);
   };
 
+  // 규칙 빌더에서 설정된 커스텀 규칙 원클릭 적용 함수
+  const applyCustomRule = (rule: CustomRule) => {
+    // 1. 진료계열 세팅
+    if (rule.condition.department && rule.condition.department !== 'ALL') {
+      setSelectedDept(rule.condition.department);
+    }
+
+    // 2. 병동 세팅 (지정 병동 또는 병동군 매핑)
+    if (rule.condition.specificWards && rule.condition.specificWards.length > 0) {
+      setSelectedWard(rule.condition.specificWards[0]);
+    } else if (rule.condition.wardGroup) {
+      if (rule.condition.wardGroup === 'GROUP_A') setSelectedWard('61병동');
+      else if (rule.condition.wardGroup === 'GROUP_B') setSelectedWard('72병동');
+      else if (rule.condition.wardGroup === 'GROUP_C') setSelectedWard('SICU');
+      else if (rule.condition.wardGroup === 'GROUP_D') setSelectedWard('72병동');
+    }
+
+    // 3. 업무 키워드 세팅
+    const kw = rule.condition.taskKeywords?.[0];
+    if (kw) {
+      const cleanKw = kw.replace(/\s+/g, '').toLowerCase();
+      const matched = tasks.find(t => t.name.replace(/\s+/g, '').toLowerCase().includes(cleanKw));
+      if (matched) {
+        setSelectedTask(matched.name);
+      } else {
+        setSelectedTask(kw);
+      }
+    }
+
+    // 4. 시간대 세팅
+    if (rule.condition.timeCategory === 'NIGHT_22_08') setSelectedTime('23:30');
+    else if (rule.condition.timeCategory === 'EVENING_17_22') setSelectedTime('19:00');
+    else if (rule.condition.timeCategory === 'MORNING_06_08') setSelectedTime('07:00');
+    else if (rule.condition.timeCategory === 'REGULAR') setSelectedTime('14:00');
+
+    // 5. 요일 세팅 (일요일 또는 주말/휴일)
+    if (rule.condition.dayCategory === 'SUNDAY_ONLY') {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = (7 - day) % 7;
+      const sunday = new Date(now);
+      sunday.setDate(now.getDate() + (diff === 0 ? 0 : diff));
+      setSelectedDate(sunday.toISOString().split('T')[0]);
+    } else if (rule.condition.dayCategory === 'WEEKEND_HOLIDAY') {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = day === 0 ? 0 : (6 - day);
+      const sat = new Date(now);
+      sat.setDate(now.getDate() + diff);
+      setSelectedDate(sat.toISOString().split('T')[0]);
+    }
+  };
+
+  const [showRuleList, setShowRuleList] = useState(false);
+  const activeCustomRules = customRules.filter(r => r.enabled);
+
   const holidayInfo = checkKoreanHoliday(selectedDate);
 
   return (
@@ -181,48 +237,108 @@ export const UserView: React.FC<UserViewProps> = ({
         </div>
       )}
 
-      {/* Quick Scenario Preset Chips */}
-      <div className="flex flex-wrap items-center gap-2 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
-        <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 px-2">
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          3초 퀵 시나리오 프리셋:
-        </span>
-        <button
-          onClick={() => applyPreset('내과', 'MICU', 'EKG', '07:00')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          🏥 평일 아침 MICU EKG(07시)
-        </button>
-        <button
-          onClick={() => applyPreset('내과', '61병동', 'ABGA', '10:00')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          🩸 61병동 정규 ABGA(10시)
-        </button>
-        <button
-          onClick={() => applyPreset('비내과', 'SICU', 'EKG', '23:30')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          🌙 야간 SICU 술기(23:30)
-        </button>
-        <button
-          onClick={() => applyPreset('비내과', '61병동', '통합의학과 사망선언')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          ⚠️ 통합의학과 사망선언
-        </button>
-        <button
-          onClick={() => applyPreset('비내과', '71병동', '3단계 이상 sore', '14:00', '2026-09-06')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          🩹 주말 sore 드레싱
-        </button>
-        <button
-          onClick={() => applyPreset('비내과', '42병동', '응급수술 Assist')}
-          className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
-        >
-          🚨 응급수술 Assist
-        </button>
+      {/* Quick Scenario Preset Chips & Dynamic Rule Builder Launcher */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 px-2">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              3초 퀵 시나리오 & 규칙 빌더 연동:
+            </span>
+
+            {/* 표준 시스템 프리셋 */}
+            <button
+              onClick={() => applyPreset('내과', 'MICU', 'EKG', '07:00')}
+              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
+            >
+              🏥 평일 07시 MICU EKG
+            </button>
+            <button
+              onClick={() => applyPreset('내과', '61병동', 'ABGA', '10:00')}
+              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
+            >
+              🩸 61병동 정규 ABGA(10시)
+            </button>
+            <button
+              onClick={() => applyPreset('비내과', 'SICU', 'EKG', '23:30')}
+              className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-700/60 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-600/50 transition"
+            >
+              🌙 야간 SICU(23:30)
+            </button>
+
+            {/* 관리자 규칙 빌더(Custom Rules) 동적 칩 목록 */}
+            {activeCustomRules.map(rule => (
+              <button
+                key={rule.id}
+                onClick={() => applyCustomRule(rule)}
+                title={`[규칙 빌더 #${rule.priority}] 클릭 시 이 규칙 조건으로 즉시 조회`}
+                className="text-xs font-extrabold px-3 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 transition flex items-center gap-1 shadow-sm"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>{rule.name}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* 규칙 빌더 세부 목록 토글 버튼 */}
+          {activeCustomRules.length > 0 && (
+            <button
+              onClick={() => setShowRuleList(prev => !prev)}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-600/40 transition flex items-center gap-1"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span>규칙 빌더 ({activeCustomRules.length}) {showRuleList ? '닫기' : '상세보기'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* 규칙 빌더 세부 규칙 목록 펼침 패널 (클릭 시 원클릭 적용) */}
+        {showRuleList && activeCustomRules.length > 0 && (
+          <div className="bg-slate-900/95 border border-amber-500/30 rounded-2xl p-4 shadow-2xl space-y-2.5 text-xs animate-fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <span className="font-extrabold text-amber-300 flex items-center gap-1.5">
+                <Sliders className="w-4 h-4 text-amber-400" />
+                관리자 화면에서 설정된 실시간 동적 규칙 목록 (클릭 시 조건 자동 세팅)
+              </span>
+              <span className="text-[10px] text-slate-400">우선순위 순서대로 평가됩니다</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {activeCustomRules.map(rule => (
+                <div
+                  key={rule.id}
+                  onClick={() => applyCustomRule(rule)}
+                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 cursor-pointer transition group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-white group-hover:text-amber-300 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-800 text-amber-400 text-[10px] flex items-center justify-center font-bold">
+                        #{rule.priority}
+                      </span>
+                      {rule.name}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      원클릭 조회
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-400 flex flex-wrap gap-1">
+                    {rule.condition.department && rule.condition.department !== 'ALL' && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">계열: {rule.condition.department}</span>
+                    )}
+                    {rule.condition.wardGroup && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">병동: {rule.condition.wardGroup}</span>
+                    )}
+                    {rule.condition.taskKeywords?.map(kw => (
+                      <span key={kw} className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">업무: "{kw}"</span>
+                    ))}
+                    <span className="text-amber-300 font-semibold ml-auto">
+                      ➜ {rule.action.assignedRole}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -453,6 +569,16 @@ export const UserView: React.FC<UserViewProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {/* Dynamic Rule Banner */}
+                {searchResult.matchedRuleName && (
+                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-300 font-bold">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      관리자 규칙 빌더 우선 적용: <strong className="text-amber-200">[{searchResult.matchedRuleName}]</strong> 조건에 의해 자동 배정되었습니다.
+                    </span>
+                  </div>
+                )}
 
                 {/* Main Role & Person Title */}
                 <div className="space-y-1">
