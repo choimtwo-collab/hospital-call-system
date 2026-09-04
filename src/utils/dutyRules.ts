@@ -250,12 +250,12 @@ export function evaluateDutyRules(
       // 0. 수혈 동의서 (상시 인턴 전담 - 전담간호사 지원 불가)
       if (isTask('수혈')) {
         const isGroupB = isIM2Ward;
-        if (!isRegularHours && isGroupB) {
+        if (isGroupB) {
           assignedRole = ROLES.IM_2;
-          notes = '내과계 병동 Group 2 야간/주말 수혈 동의서는 내과 당직인턴 2 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).';
+          notes = `내과계 병동 Group 2(${selectedWard}) 수혈 동의서는 내과 인턴 2 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
         } else {
           assignedRole = ROLES.IM_1;
-          notes = `${isRegularHours ? '평일 정규시간' : '야간/주말'} 병동 수혈 동의서는 내과 인턴(내과1) 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          notes = `내과계 병동 Group 1(${selectedWard}) 수혈 동의서는 내과 인턴 1 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
         }
       }
       // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
@@ -300,9 +300,14 @@ export function evaluateDutyRules(
             notes = '평일 정규시간 일반병동 ABGA/Line 채혈은 공통 전담간호사 연결입니다.';
           }
         } else {
-          // EKG(P), 수혈동의서, T-tube 교체 등 -> 내과1 인턴
-          assignedRole = ROLES.IM_1;
-          notes = '평일 정규시간 필수 술기/심전도는 내과 인턴(내과1) 담당입니다.';
+          // EKG(P), T-tube 교체 등 필수 술기 -> 병동 그룹(Group 1 vs Group 2)에 따라 내과1 또는 내과2
+          if (isIM2Ward) {
+            assignedRole = ROLES.IM_2;
+            notes = `평일 정규시간 ${selectedWard} (내과 Group 2) 필수 술기/심전도는 내과 인턴 2 담당입니다.`;
+          } else {
+            assignedRole = ROLES.IM_1;
+            notes = `평일 정규시간 ${selectedWard} (내과 Group 1) 필수 술기/심전도는 내과 인턴 1 담당입니다.`;
+          }
         }
       } else {
         // 정규시간 외 (평일 17:00~08:00, 주말/휴일 종일)
@@ -495,8 +500,8 @@ export function evaluateDutyRules(
     if (assignedRole === ROLES.COMMON_NURSE || assignedRole === ROLES.DUTY_NURSE) {
       if (selectedDept === '내과') {
         const isGroupB = isIM2Ward;
-        assignedRole = (!isRegularHours && isGroupB) ? ROLES.IM_2 : ROLES.IM_1;
-        notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 내과 ${assignedRole === ROLES.IM_2 ? '당직인턴 2' : '당직인턴 1'}로 연결됩니다.`;
+        assignedRole = isGroupB ? ROLES.IM_2 : ROLES.IM_1;
+        notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 내과 ${assignedRole === ROLES.IM_2 ? '인턴 2' : '인턴 1'}로 연결됩니다.`;
       } else {
         const isGroupC = isNonIM2Ward;
         assignedRole = isGroupC ? ROLES.NON_IM_2 : (isNonIM1Ward ? ROLES.NON_IM_1 : ROLES.NON_IM_3);
