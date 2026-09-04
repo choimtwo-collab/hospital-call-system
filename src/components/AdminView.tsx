@@ -49,9 +49,9 @@ interface AdminViewProps {
   cnGroupSchedules?: CNGroupSchedule[];
   setCnGroupSchedules?: React.Dispatch<React.SetStateAction<CNGroupSchedule[]>>;
   emergencyContacts?: EmergencyContact[];
-  setEmergencyContacts?: React.Dispatch<React.SetStateAction<EmergencyContact[]>>;
+  setEmergencyContacts?: React.Dispatch<React.SetStateAction<EmergencyContact[]>> | ((value: EmergencyContact[]) => void);
   internWardGroups?: InternWardGroupSetting[];
-  setInternWardGroups?: React.Dispatch<React.SetStateAction<InternWardGroupSetting[]>>;
+  setInternWardGroups?: React.Dispatch<React.SetStateAction<InternWardGroupSetting[]>> | ((value: InternWardGroupSetting[]) => void);
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
@@ -695,7 +695,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       category: newHotlineCategory
     };
     if (setEmergencyContacts) {
-      setEmergencyContacts(prev => [...prev, newContact]);
+      setEmergencyContacts([...(emergencyContacts || []), newContact]);
     }
     setNewHotlineDept('');
     setNewHotlineName('');
@@ -707,7 +707,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleDeleteHotline = (id: string, name: string) => {
     if (confirm(`[${name}] 핫라인을 삭제하시겠습니까? 간호사 메인 화면에서도 즉시 제거됩니다.`)) {
       if (setEmergencyContacts) {
-        setEmergencyContacts(prev => prev.filter(c => c.id !== id));
+        setEmergencyContacts((emergencyContacts || []).filter(c => c.id !== id));
       }
       showSaveSuccess(`[${name}] 핫라인이 삭제되었습니다.`);
     }
@@ -715,12 +715,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   const handleUpdateHotline = (id: string, field: keyof EmergencyContact, value: string) => {
     if (setEmergencyContacts) {
-      setEmergencyContacts(prev => prev.map(c => {
+      const updated = (emergencyContacts || []).map(c => {
         if (c.id === id) {
           return { ...c, [field]: value };
         }
         return c;
-      }));
+      });
+      setEmergencyContacts(updated);
     }
   };
 
@@ -736,33 +737,37 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // --- Intern Ward Groups Handlers (내과 1·2, 비내과 1·2·3) ---
   const handleToggleWardForIntern = (roleId: string, ward: string) => {
     if (!setInternWardGroups) return;
-    setInternWardGroups(prev => prev.map(g => {
+    const updated = (internWardGroups || []).map(g => {
       if (g.id !== roleId) return g;
       const exists = g.wards.some(w => areWardsEqual(w, ward));
       const updatedWards = exists
         ? g.wards.filter(w => !areWardsEqual(w, ward))
         : [...g.wards.filter(w => !areWardsEqual(w, ward)), ward];
       return { ...g, wards: updatedWards };
-    }));
+    });
+    setInternWardGroups(updated);
   };
 
   const handleSetWardsForIntern = (roleId: string, wards: string[]) => {
     if (!setInternWardGroups) return;
-    setInternWardGroups(prev => prev.map(g => g.id === roleId ? { ...g, wards } : g));
+    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...g, wards } : g);
+    setInternWardGroups(updated);
   };
 
   const handleUpdateInternGroupTitle = (roleId: string, newTitle: string) => {
     if (!setInternWardGroups) return;
-    setInternWardGroups(prev => prev.map(g => g.id === roleId ? { ...g, title: newTitle } : g));
+    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...g, title: newTitle } : g);
+    setInternWardGroups(updated);
   };
 
   const handleSyncInternGroupTitleWithWards = (roleId: string) => {
     if (!setInternWardGroups) return;
-    setInternWardGroups(prev => prev.map(g => {
+    const updated = (internWardGroups || []).map(g => {
       if (g.id !== roleId) return g;
       const newTitle = g.wards.length > 0 ? `${g.shortName} 관할 (${g.wards.join(', ')})` : `${g.shortName} 병동 그룹`;
       return { ...g, title: newTitle };
-    }));
+    });
+    setInternWardGroups(updated);
     showSaveSuccess('병동 목록으로 명칭이 자동 반영되었습니다.');
   };
 
@@ -778,7 +783,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleResetSingleInternWardGroup = (roleId: string) => {
     const defaultGrp = initialInternWardGroups.find(g => g.id === roleId);
     if (!defaultGrp || !setInternWardGroups) return;
-    setInternWardGroups(prev => prev.map(g => g.id === roleId ? { ...defaultGrp } : g));
+    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...defaultGrp } : g);
+    setInternWardGroups(updated);
     showSaveSuccess(`[${defaultGrp.shortName}] 담당 병동이 기본값으로 복원되었습니다.`);
   };
 

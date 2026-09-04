@@ -8,6 +8,7 @@ import {
   initialCustomRules, initialInterns, initialPathologistSchedules,
   initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups
 } from './data/initialData';
+import { useSettings } from './context/SettingsContext';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
   TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule, EmergencyContact, InternWardGroupSetting 
@@ -36,6 +37,7 @@ const STORAGE_KEYS = {
 
 export default function App() {
   const [view, setView] = useState<'user' | 'admin'>('user');
+  const { settings: neonSettings, updateInternWardGroups, updateHotlines } = useSettings();
 
   // Lazy initialize state from LocalStorage or default initial dataset
   const [schedules, setSchedules] = useState<DateScheduleMap>(() => {
@@ -117,15 +119,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialCNGroupSchedules;
   });
 
-  const [emergencyContactsList, setEmergencyContactsList] = useState<EmergencyContact[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.HOTLINES);
-    return saved ? JSON.parse(saved) : emergencyContacts;
-  });
-
-  const [internWardGroups, setInternWardGroups] = useState<InternWardGroupSetting[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.INTERN_WARD_GROUPS);
-    return saved ? JSON.parse(saved) : initialInternWardGroups;
-  });
+  // emergencyContactsList & internWardGroups are now from Neon via useSettings()
+  const emergencyContactsList = neonSettings.hotlines;
+  const internWardGroups = neonSettings.internWardGroups;
 
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
@@ -135,13 +131,7 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(schedules));
   }, [schedules]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.HOTLINES, JSON.stringify(emergencyContactsList));
-  }, [emergencyContactsList]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.INTERN_WARD_GROUPS, JSON.stringify(internWardGroups));
-  }, [internWardGroups]);
+  // HOTLINES and INTERN_WARD_GROUPS are now synced via Neon API (SettingsContext)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.DUTY_ROLES, JSON.stringify(dutyRoles));
@@ -251,8 +241,8 @@ export default function App() {
     setDutyRoles(initialDutyRoles);
     setDutyPhones(initialDutyPhones);
     setCnGroupSchedules(initialCNGroupSchedules);
-    setEmergencyContactsList(emergencyContacts);
-    setInternWardGroups(initialInternWardGroups);
+    updateHotlines(emergencyContacts);
+    updateInternWardGroups(initialInternWardGroups);
   };
 
   return (
@@ -284,8 +274,8 @@ export default function App() {
             dutyPhones={dutyPhones}
             cnGroupSchedules={cnGroupSchedules}
             interns={interns}
-            emergencyContacts={emergencyContactsList}
-            internWardGroups={internWardGroups}
+            emergencyContacts={neonSettings.hotlines}
+            internWardGroups={neonSettings.internWardGroups}
             sheetsConfig={sheetsConfig}
             onSyncSheets={() => handleSyncSheets()}
             isSyncingSheets={isSyncingSheets}
@@ -318,10 +308,10 @@ export default function App() {
             setDutyPhones={setDutyPhones}
             cnGroupSchedules={cnGroupSchedules}
             setCnGroupSchedules={setCnGroupSchedules}
-            emergencyContacts={emergencyContactsList}
-            setEmergencyContacts={setEmergencyContactsList}
-            internWardGroups={internWardGroups}
-            setInternWardGroups={setInternWardGroups}
+            emergencyContacts={neonSettings.hotlines}
+            setEmergencyContacts={updateHotlines}
+            internWardGroups={neonSettings.internWardGroups}
+            setInternWardGroups={updateInternWardGroups}
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}
