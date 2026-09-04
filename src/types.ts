@@ -41,6 +41,19 @@ export interface CNGroupSchedule {
   schedule: Record<string, Record<number, CNShiftCell>>;
 }
 
+export interface InternWardGroupSetting {
+  id: string; // 'im_1' | 'im_2' | 'non_im_1' | 'non_im_2' | 'non_im_3'
+  roleKey: string; // e.g. ROLES.IM_1
+  roleName: string; // e.g. '내과1 (인턴1)'
+  shortName: string; // e.g. '내과 1'
+  dept: '내과' | '비내과';
+  title: string; // e.g. '내과계 병동 Group 1 (MICU 등)'
+  wards: string[];
+  defaultPhone?: string;
+  defaultUcap?: string;
+  description?: string;
+}
+
 // weeklyCNSchedule[dayOfWeek 0..6][timeSlotId][cnPostId] = nurseName
 export type WeeklyCNScheduleMap = Record<number, Record<string, Record<string, string>>>;
 

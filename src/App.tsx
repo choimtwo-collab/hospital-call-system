@@ -6,11 +6,11 @@ import {
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
-  initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts
+  initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups
 } from './data/initialData';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule, EmergencyContact 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule, EmergencyContact, InternWardGroupSetting 
 } from './types';
 import { 
   GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
@@ -30,7 +30,8 @@ const STORAGE_KEYS = {
   DUTY_ROLES: 'hcs_duty_roles_v1',
   DUTY_PHONES: 'hcs_duty_phones_v1',
   CN_GROUP_SCHEDULES: 'hcs_cn_group_schedules_v1',
-  HOTLINES: 'hcs_hotlines_v1'
+  HOTLINES: 'hcs_hotlines_v1',
+  INTERN_WARD_GROUPS: 'hcs_intern_ward_groups_v1'
 };
 
 export default function App() {
@@ -121,6 +122,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : emergencyContacts;
   });
 
+  const [internWardGroups, setInternWardGroups] = useState<InternWardGroupSetting[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.INTERN_WARD_GROUPS);
+    return saved ? JSON.parse(saved) : initialInternWardGroups;
+  });
+
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
@@ -132,6 +138,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.HOTLINES, JSON.stringify(emergencyContactsList));
   }, [emergencyContactsList]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.INTERN_WARD_GROUPS, JSON.stringify(internWardGroups));
+  }, [internWardGroups]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.DUTY_ROLES, JSON.stringify(dutyRoles));
@@ -242,6 +252,7 @@ export default function App() {
     setDutyPhones(initialDutyPhones);
     setCnGroupSchedules(initialCNGroupSchedules);
     setEmergencyContactsList(emergencyContacts);
+    setInternWardGroups(initialInternWardGroups);
   };
 
   return (
@@ -274,6 +285,7 @@ export default function App() {
             cnGroupSchedules={cnGroupSchedules}
             interns={interns}
             emergencyContacts={emergencyContactsList}
+            internWardGroups={internWardGroups}
             sheetsConfig={sheetsConfig}
             onSyncSheets={() => handleSyncSheets()}
             isSyncingSheets={isSyncingSheets}
@@ -308,6 +320,8 @@ export default function App() {
             setCnGroupSchedules={setCnGroupSchedules}
             emergencyContacts={emergencyContactsList}
             setEmergencyContacts={setEmergencyContactsList}
+            internWardGroups={internWardGroups}
+            setInternWardGroups={setInternWardGroups}
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}

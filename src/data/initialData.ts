@@ -1,7 +1,7 @@
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
   EmergencyContact, TaskItem, CustomRule, InternDoctor, PathologistSchedule, 
-  DutyPhoneItem, CNGroupSchedule, CNShiftCell 
+  DutyPhoneItem, CNGroupSchedule, CNShiftCell, InternWardGroupSetting 
 } from '../types';
 
 export const DEPARTMENTS = ['내과', '비내과'] as const;
@@ -42,6 +42,70 @@ export const WARD_GROUPS = {
   GROUP_C: ['SICU', '분만장', 'DR', 'DSR', '42병동', '61병동', '62병동', 'NICU'],
   GROUP_D: ['71병동', '72병동', '81병동', '82병동', '92병동', '101병동', '102병동', '111병동', '112병동', '121병동']
 };
+
+// 인턴 역할별 기본 담당 병동 그룹 설정 (내과1, 내과2, 비내과1, 비내과2, 비내과3)
+export const initialInternWardGroups: InternWardGroupSetting[] = [
+  {
+    id: 'im_1',
+    roleKey: ROLES.IM_1,
+    roleName: '내과1 (인턴1)',
+    shortName: '내과 1',
+    dept: '내과',
+    title: '내과계 병동 Group 1 (MICU 등)',
+    wards: ['42병동', '61병동', '62병동', '82병동', '92병동', '102병동', 'MICU', 'AKU', '주사실', '한방'],
+    defaultPhone: '근무표 참조',
+    defaultUcap: '개인 UCAP',
+    description: 'MICU 및 42, 61, 62, 82, 92, 102병동 등 내과계 전담'
+  },
+  {
+    id: 'im_2',
+    roleKey: ROLES.IM_2,
+    roleName: '내과2 (인턴2)',
+    shortName: '내과 2',
+    dept: '내과',
+    title: '내과계 병동 Group 2 (71, 72, 81W 등)',
+    wards: ['71병동', '72병동', '81병동', '101병동', '111병동', '112병동', '121병동'],
+    defaultPhone: '근무표 참조',
+    defaultUcap: '개인 UCAP',
+    description: '71, 72, 81, 101, 111, 112, 121병동 등 내과계 전담'
+  },
+  {
+    id: 'non_im_1',
+    roleKey: ROLES.NON_IM_1,
+    roleName: '비내과1 (당직인턴1)',
+    shortName: '비내과 1',
+    dept: '비내과',
+    title: '비내과계 응급수술/시술 및 지정 담당 병동',
+    wards: ['응급실', '수술실', 'DR', 'DSR'],
+    defaultPhone: '010-7628-5803',
+    defaultUcap: '5-4080',
+    description: '응급수술 Assist, 주말 sore 특수드레싱, 마취동의서 및 지정 병동'
+  },
+  {
+    id: 'non_im_2',
+    roleKey: ROLES.NON_IM_2,
+    roleName: '비내과2 (당직인턴2)',
+    shortName: '비내과 2',
+    dept: '비내과',
+    title: '비내과계 병동 Group C (SICU/외과계)',
+    wards: ['SICU', '분만장', 'DR', 'DSR', '42병동', '61병동', '62병동', 'NICU'],
+    defaultPhone: '010-7624-5803',
+    defaultUcap: '5-4081',
+    description: 'SICU, 분만장, 42, 61, 62, NICU 등 비내과계 전담'
+  },
+  {
+    id: 'non_im_3',
+    roleKey: ROLES.NON_IM_3,
+    roleName: '비내과3 (당직인턴3)',
+    shortName: '비내과 3',
+    dept: '비내과',
+    title: '비내과계 병동 Group D (71~121병동 등)',
+    wards: ['71병동', '72병동', '81병동', '82병동', '92병동', '101병동', '102병동', '111병동', '112병동', '121병동'],
+    defaultPhone: '010-5794-4170',
+    defaultUcap: '5-3499',
+    description: '71, 72, 81, 82, 92, 101, 102, 111, 112, 121병동 등 비내과계 전담'
+  }
+];
 
 export const WARD_OPTIONS: Record<DepartmentType, string[]> = {
   '내과': [

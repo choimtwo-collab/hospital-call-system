@@ -11,7 +11,7 @@ import {
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
   SearchResult, TaskItem, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule,
-  InternDoctor, EmergencyContact 
+  InternDoctor, EmergencyContact, InternWardGroupSetting 
 } from '../types';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
@@ -30,6 +30,7 @@ interface UserViewProps {
   cnGroupSchedules?: CNGroupSchedule[];
   interns?: InternDoctor[];
   emergencyContacts?: EmergencyContact[];
+  internWardGroups?: InternWardGroupSetting[];
   sheetsConfig: GoogleSheetsConfig;
   onSyncSheets: () => void;
   isSyncingSheets: boolean;
@@ -50,6 +51,7 @@ export const UserView: React.FC<UserViewProps> = ({
   cnGroupSchedules = [],
   interns = [],
   emergencyContacts = defaultEmergencyContacts,
+  internWardGroups = [],
   sheetsConfig,
   onSyncSheets,
   isSyncingSheets
@@ -109,10 +111,11 @@ export const UserView: React.FC<UserViewProps> = ({
       dutyPhones,
       cnGroupSchedules,
       interns,
-      tasks
+      tasks,
+      internWardGroups
     );
     setSearchResult(result);
-  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules, dutyPhones, cnGroupSchedules, interns, tasks]);
+  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules, dutyPhones, cnGroupSchedules, interns, tasks, internWardGroups]);
 
   const setToCurrentTime = () => {
     const iso = getLocalISOString();
