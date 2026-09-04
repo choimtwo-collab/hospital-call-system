@@ -15,10 +15,13 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
+  let databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     return res.status(500).json({ error: 'DATABASE_URL is not configured in environment variables' });
   }
+
+  // 줄바꿈, 다중 행, 공백, 따옴표 등 실수로 중복 붙여넣기된 경우 방어
+  databaseUrl = databaseUrl.trim().split(/[\r\n]+/)[0].trim().replace(/^['"]|['"]$/g, '');
 
   const sql = neon(databaseUrl);
 
