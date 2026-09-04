@@ -2,19 +2,22 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { UserView } from './components/UserView';
 import { AdminView } from './components/AdminView';
+import { AuthModal } from './components/AuthModal';
 import { 
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
   initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups
 } from './data/initialData';
+import { initialUsers } from './utils/authUtils';
 import { useSettings } from './context/SettingsContext';
 import { 
   fetchAllSettings, subscribeToSettings, saveSettingDebounced 
 } from './api/settingsApi';
 import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule,
+  AppUser
 } from './types';
 import { 
   GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
@@ -35,7 +38,9 @@ const STORAGE_KEYS = {
   DUTY_PHONES: 'hcs_duty_phones_v1',
   CN_GROUP_SCHEDULES: 'hcs_cn_group_schedules_v1',
   HOTLINES: 'hcs_hotlines_v1',
-  INTERN_WARD_GROUPS: 'hcs_intern_ward_groups_v1'
+  INTERN_WARD_GROUPS: 'hcs_intern_ward_groups_v1',
+  APP_USERS: 'hcs_app_users_v1',
+  AUTH_USER: 'hcs_auth_user_v1'
 };
 
 const DB_KEYS = {
@@ -53,7 +58,8 @@ const DB_KEYS = {
   DUTY_PHONES: 'duty_phones',
   CN_GROUP_SCHEDULES: 'cn_group_schedules',
   HOTLINES: 'hotlines',
-  INTERN_WARD_GROUPS: 'intern_ward_groups'
+  INTERN_WARD_GROUPS: 'intern_ward_groups',
+  APP_USERS: 'app_users'
 };
 
 export default function App() {
@@ -145,6 +151,30 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialCNGroupSchedules;
   });
 
+  // 사용자 계정 및 권한 목록 (기본: initialUsers 슈퍼 관리자 포함)
+  const [users, setUsers] = useState<AppUser[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.APP_USERS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return initialUsers;
+  });
+
+  // 현재 로그인한 사용자 세션 (LocalStorage 영속화)
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
@@ -173,6 +203,7 @@ export default function App() {
         if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
         if (settings[DB_KEYS.HOTLINES]) updateHotlines(settings[DB_KEYS.HOTLINES]);
         if (settings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
+        if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);
 
         setIsCloudConnected(true);
         setLastCloudSyncAt(new Date().toLocaleTimeString());
@@ -209,6 +240,7 @@ export default function App() {
       if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]);
       if (remoteSettings[DB_KEYS.HOTLINES]) updateHotlines(remoteSettings[DB_KEYS.HOTLINES]);
       if (remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]);
+      if (remoteSettings[DB_KEYS.APP_USERS]) setUsers(remoteSettings[DB_KEYS.APP_USERS]);
 
       setIsCloudConnected(true);
       setLastCloudSyncAt(new Date().toLocaleTimeString());
@@ -242,6 +274,7 @@ export default function App() {
   useEffect(() => { syncState(STORAGE_KEYS.INTERNS, DB_KEYS.INTERNS, interns); }, [interns, syncState]);
   useEffect(() => { syncState(STORAGE_KEYS.PATHOLOGISTS, DB_KEYS.PATHOLOGISTS, pathologistSchedules); }, [pathologistSchedules, syncState]);
   useEffect(() => { syncState(STORAGE_KEYS.SHEETS_CONFIG, DB_KEYS.SHEETS_CONFIG, sheetsConfig); }, [sheetsConfig, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.APP_USERS, DB_KEYS.APP_USERS, users); }, [users, syncState]);
 
   // ─── 3. Google Sheets Sync Action ───
   const handleSyncSheets = useCallback(async (customUrl?: string, customName?: string) => {
@@ -317,6 +350,23 @@ export default function App() {
     saveSettingDebounced(DB_KEYS.CN_GROUP_SCHEDULES, initialCNGroupSchedules);
   };
 
+  // ─── 4. 인증 핸들러 ───
+  const handleLoginSuccess = useCallback((user: AppUser) => {
+    setCurrentUser(user);
+    localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(user));
+    setView('admin');
+  }, []);
+
+  const handleRegisterUser = useCallback((newUser: AppUser) => {
+    setUsers(prev => [...prev, newUser]);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+    setView('user');
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-cyan-500 selection:text-white">
       
@@ -335,6 +385,9 @@ export default function App() {
         onResetData={handleResetData}
         isCloudConnected={isCloudConnected}
         lastCloudSyncAt={lastCloudSyncAt}
+        currentUser={currentUser}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace View Container */}
@@ -393,9 +446,21 @@ export default function App() {
             onSyncSheets={handleSyncSheets}
             isSyncingSheets={isSyncingSheets}
             onResetData={handleResetData}
+            users={users}
+            setUsers={setUsers}
+            currentUser={currentUser}
           />
         )}
       </main>
+
+      {/* Auth Modal (로그인 & 회원가입) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        users={users}
+        onLoginSuccess={handleLoginSuccess}
+        onRegisterUser={handleRegisterUser}
+      />
 
       {/* Modern System Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800/80 py-6 mt-12">

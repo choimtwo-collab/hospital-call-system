@@ -158,3 +158,49 @@ export interface PathologistSchedule {
   ucap: string;
   notes?: string;
 }
+
+// ─── 사용자 인증 및 화면별 권한 관리 (RBAC) ───
+export type AdminTabId = 
+  | 'schedules'    // 당직표 관리 & 엑셀 업로드
+  | 'sheets'       // 구글 시트 실시간 연동
+  | 'tasks'        // 업무 마스터 설정
+  | 'rules'        // 규칙 빌더
+  | 'contacts'     // 의료진 & 임상병리사 연락망
+  | 'common_nurse' // 공통전담간호 근무 매트릭스
+  | 'hotlines'     // 주요 핫라인 관리
+  | 'users'        // 사용자 및 권한 관리 (최고 관리자 전용)
+  | 'data';        // 데이터 백업 & 복원
+
+export interface AdminTabInfo {
+  id: AdminTabId;
+  name: string;
+  description: string;
+  iconName?: string;
+}
+
+export const ALL_ADMIN_TABS: AdminTabInfo[] = [
+  { id: 'schedules', name: '당직표 관리 & 엑셀 업로드', description: '월간 인턴 당직표 편집 및 엑셀 업로드' },
+  { id: 'sheets', name: '구글 시트 실시간 연동', description: '구글 스프레드시트 당직표 자동 동기화' },
+  { id: 'tasks', name: '업무 마스터 설정', description: '20종 표준 업무 및 의사/전담간호사 매칭 규격' },
+  { id: 'rules', name: '규칙 빌더 (Rule Builder)', description: '우선순위 기반 동적 당직 라우팅 규칙' },
+  { id: 'contacts', name: '의료진 & 임상병리사 연락망', description: '인턴/전공의 연락망 및 EKG 임상병리사 관리' },
+  { id: 'common_nurse', name: '공통전담간호 근무 매트릭스', description: '3교대 근무표 및 포스트별 공용폰/UCAP 관리' },
+  { id: 'hotlines', name: '주요 핫라인 관리', description: '원내 비상 핫라인 및 긴급 연락망 관리' },
+  { id: 'data', name: '데이터 백업 & 복원', description: '전체 설정 JSON 백업 및 복원' },
+  { id: 'users', name: '사용자 및 권한 관리', description: '회원 승인 및 화면별 세부 권한 부여 (최고 관리자)' }
+];
+
+export interface AppUser {
+  id: string;
+  username: string; // 로그인 아이디
+  name: string;     // 사용자 성명
+  department: string; // 소속 병동 / 부서 (예: 61병동, 간호부, 수련교육팀)
+  position?: string;  // 직급 (예: 수간호사, 주임, 인턴의국장)
+  passwordHash: string; // SHA-256 해시 비밀번호
+  role: 'SUPER_ADMIN' | 'MANAGER' | 'USER';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  permissions: AdminTabId[]; // 권한이 부여된 관리자 탭 ID 목록
+  createdAt: string;
+  lastLoginAt?: string;
+}
+

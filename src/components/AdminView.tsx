@@ -4,7 +4,7 @@ import {
   RotateCcw, Download, Upload, Save, CheckCircle2, AlertCircle, Search,
   FileSpreadsheet, Sliders, Tag, ArrowRight, Shield, ToggleLeft, ToggleRight,
   HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2,
-  PhoneCall, ShieldCheck, HeartPulse
+  PhoneCall, ShieldCheck, HeartPulse, Lock
 } from 'lucide-react';
 import { 
   ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, WARD_OPTIONS, getCNPostContact, areWardsEqual, initialTasks,
@@ -20,6 +20,8 @@ import { parseDutyExcel, generateSampleExcelBlob, ParsedDutyResult } from '../ut
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { CalendarDutyView } from './CalendarDutyView';
 import { getScheduleDoctor } from '../utils/dutyRules';
+import { AdminUserManagement } from './AdminUserManagement';
+import { AppUser, AdminTabId } from '../types';
 
 interface AdminViewProps {
   schedules: DateScheduleMap;
@@ -55,6 +57,10 @@ interface AdminViewProps {
   onSyncSheets: (customUrl?: string, customName?: string) => Promise<void>;
   isSyncingSheets: boolean;
   onResetData: () => void;
+  // RBAC 사용자 및 권한 관리 Props
+  users?: AppUser[];
+  setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
+  currentUser?: AppUser | null;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -77,9 +83,39 @@ export const AdminView: React.FC<AdminViewProps> = ({
   internWardGroups = initialInternWardGroups,
   setInternWardGroups,
   onSyncSheets, isSyncingSheets,
-  onResetData
+  onResetData,
+  users = [],
+  setUsers,
+  currentUser = null
 }) => {
-  const [adminTab, setAdminTab] = useState<'schedules' | 'sheets' | 'tasks' | 'rules' | 'contacts' | 'common_nurse' | 'hotlines' | 'data'>('schedules');
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const userPermissions: AdminTabId[] = currentUser?.permissions || [];
+
+  const canAccessTab = (tabId: AdminTabId): boolean => {
+    if (!currentUser) return false;
+    if (isSuperAdmin) return true;
+    if (tabId === 'users') return false; // 사용자 관리는 최고 관리자만
+    return userPermissions.includes(tabId);
+  };
+
+  const [adminTab, setAdminTab] = useState<AdminTabId>(() => {
+    if (isSuperAdmin) return 'schedules';
+    if (userPermissions.length > 0) return userPermissions[0];
+    return 'schedules';
+  });
+
+  // 사용자의 권한 변경 시 접근 가능한 탭으로 자동 보정
+  React.useEffect(() => {
+    if (!currentUser) return;
+    if (!canAccessTab(adminTab)) {
+      const availableTabs: AdminTabId[] = ['schedules', 'sheets', 'tasks', 'rules', 'contacts', 'common_nurse', 'hotlines', 'data', 'users'];
+      const firstAvailable = availableTabs.find(t => canAccessTab(t));
+      if (firstAvailable) {
+        setAdminTab(firstAvailable);
+      }
+    }
+  }, [currentUser, adminTab]);
+
   const [scheduleSubTab, setScheduleSubTab] = useState<'schedule' | 'ward_groups'>('schedule');
   const [editingInternWardsRoleId, setEditingInternWardsRoleId] = useState<string | null>(null);
   const [scheduleViewMode, setScheduleViewMode] = useState<'calendar' | 'list'>('calendar');
@@ -901,107 +937,152 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
       )}
 
-      {/* Admin Navigation Tabs */}
+      {/* Admin Navigation Tabs (Role & Permission Filtered) */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
-        <button
-          onClick={() => setAdminTab('schedules')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'schedules'
-              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          당직표 관리 & 엑셀 업로드
-        </button>
+        {canAccessTab('schedules') && (
+          <button
+            onClick={() => setAdminTab('schedules')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'schedules'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            당직표 관리 & 엑셀 업로드
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('sheets')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'sheets'
-              ? 'bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          구글 시트 실시간 연동
-          {sheetsConfig.enabled && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          )}
-        </button>
+        {canAccessTab('sheets') && (
+          <button
+            onClick={() => setAdminTab('sheets')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'sheets'
+                ? 'bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            구글 시트 실시간 연동
+            {sheetsConfig.enabled && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            )}
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('tasks')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'tasks'
-              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Tag className="w-4 h-4" />
-          업무 마스터 설정 ({tasks.length})
-        </button>
+        {canAccessTab('tasks') && (
+          <button
+            onClick={() => setAdminTab('tasks')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'tasks'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            업무 마스터 설정 ({tasks.length})
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('rules')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'rules'
-              ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          규칙 빌더 (Rule Builder) ({customRules.length})
-        </button>
+        {canAccessTab('rules') && (
+          <button
+            onClick={() => setAdminTab('rules')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'rules'
+                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            규칙 빌더 (Rule Builder) ({customRules.length})
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('contacts')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'contacts'
-              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          의료진 & 임상병리사 연락망
-        </button>
+        {canAccessTab('contacts') && (
+          <button
+            onClick={() => setAdminTab('contacts')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'contacts'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            의료진 & 임상병리사 연락망
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('common_nurse')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'common_nurse'
-              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          공통전담간호 근무 매트릭스
-        </button>
+        {canAccessTab('common_nurse') && (
+          <button
+            onClick={() => setAdminTab('common_nurse')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'common_nurse'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            공통전담간호 근무 매트릭스
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('hotlines')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'hotlines'
-              ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-black'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          주요 핫라인 관리 ({emergencyContacts.length})
-        </button>
+        {canAccessTab('hotlines') && (
+          <button
+            onClick={() => setAdminTab('hotlines')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'hotlines'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-black'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            주요 핫라인 관리 ({emergencyContacts.length})
+          </button>
+        )}
 
-        <button
-          onClick={() => setAdminTab('data')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
-            adminTab === 'data'
-              ? 'bg-slate-700 text-white'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Download className="w-4 h-4" />
-          데이터 백업 & 복원
-        </button>
+        {canAccessTab('data') && (
+          <button
+            onClick={() => setAdminTab('data')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'data'
+                ? 'bg-slate-700 text-white'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Download className="w-4 h-4" />
+            데이터 백업 & 복원
+          </button>
+        )}
+
+        {/* Super Admin 전용 사용자 및 권한 관리 탭 */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => setAdminTab('users')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              adminTab === 'users'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25'
+                : 'text-purple-300 hover:text-white hover:bg-purple-950/40 border border-purple-500/30'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            사용자 & 권한 관리 ({users.length})
+          </button>
+        )}
       </div>
+
+      {/* 권한이 부여된 탭이 하나도 없을 때의 가드 안내 */}
+      {!isSuperAdmin && userPermissions.length === 0 && (
+        <div className="glass-panel p-8 rounded-3xl border border-amber-500/40 bg-amber-950/15 shadow-2xl text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-black text-white">관리 권한 승인 대기 중</h3>
+          <p className="text-xs text-slate-300 max-w-md mx-auto">
+            <strong>{currentUser?.name}</strong>님은 현재 관리자 화면 수정 권한이 부여되지 않았습니다.<br />
+            최고 관리자(admin)에게 연락하여 열람 및 수정이 필요한 화면(당직표, 연락망, 공통전담 등)의 권한 부여를 요청하세요.
+          </p>
+        </div>
+      )}
 
       {/* ==================================================================== */}
       {/* TAB 1: SCHEDULES & EXCEL UPLOADER & INTERN WARD GROUPS               */}
@@ -4636,6 +4717,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* TAB 7: USER & PERMISSION MANAGEMENT (SUPER ADMIN ONLY)              */}
+      {/* ==================================================================== */}
+      {adminTab === 'users' && isSuperAdmin && setUsers && (
+        <AdminUserManagement
+          users={users}
+          setUsers={setUsers}
+          currentUser={currentUser}
+          showSaveSuccess={showSaveSuccess}
+        />
       )}
 
     </div>

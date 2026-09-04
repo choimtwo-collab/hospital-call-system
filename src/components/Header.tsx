@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Shield, User, Clock, Database } from 'lucide-react';
+import { Activity, Shield, User, Clock, Database, LogIn, LogOut, ShieldCheck, Lock } from 'lucide-react';
+import { AppUser } from '../types';
 
 interface HeaderProps {
   view: 'user' | 'admin';
@@ -7,13 +8,19 @@ interface HeaderProps {
   onResetData?: () => void;
   isCloudConnected?: boolean;
   lastCloudSyncAt?: string | null;
+  currentUser?: AppUser | null;
+  onOpenAuthModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
   view, 
   setView, 
   isCloudConnected = false,
-  lastCloudSyncAt = null
+  lastCloudSyncAt = null,
+  currentUser = null,
+  onOpenAuthModal,
+  onLogout
 }) => {
   const [timeStr, setTimeStr] = useState<string>('');
 
@@ -80,6 +87,36 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{timeStr}</span>
           </div>
 
+          {/* User Auth Profile Badge or Login Button */}
+          {currentUser ? (
+            <div className="flex items-center gap-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-purple-500/40 shadow-sm">
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-white">{currentUser.name}</span>
+                <span className="text-[10px] text-purple-300 font-semibold hidden sm:inline">
+                  ({currentUser.role === 'SUPER_ADMIN' ? '최고관리자' : (currentUser.department || '관리자')})
+                </span>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/60 transition ml-1"
+                  title="로그아웃"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={onOpenAuthModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-extrabold transition shadow-sm"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>관리자 로그인</span>
+            </button>
+          )}
+
           {/* Toggle Switch */}
           <div className="flex bg-slate-800/90 p-1 rounded-xl border border-slate-700/80 shadow-inner">
             <button
@@ -95,14 +132,21 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
-              onClick={() => setView('admin')}
+              onClick={() => {
+                if (!currentUser) {
+                  if (onOpenAuthModal) onOpenAuthModal();
+                  return;
+                }
+                setView('admin');
+              }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 ${
                 view === 'admin'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-indigo-500/25'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
+              title={currentUser ? '관리자 설정으로 전환' : '관리자 설정은 로그인이 필요합니다'}
             >
-              <Shield className="w-3.5 h-3.5" />
+              {currentUser ? <Shield className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-purple-400" />}
               <span>관리자 설정</span>
             </button>
           </div>
