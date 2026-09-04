@@ -58,6 +58,9 @@ export interface SearchResult {
   backupContact2?: ContactInfo & { roleName: string };
   notes: string;
   ruleSource?: 'DYNAMIC_RULE' | 'SYSTEM_DEFAULT';
+  matchedRuleName?: string;
+  matchedTaskItem?: TaskItem;
+  matchedWardGroup?: string;
 }
 
 export interface EmergencyContact {

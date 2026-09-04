@@ -3,14 +3,15 @@ import {
   Calendar, Clock, Phone, PhoneCall, ShieldAlert, CheckCircle2, 
   Building2, FileText, Zap, ChevronRight, AlertTriangle, ExternalLink, 
   RefreshCw, Bookmark, BookmarkCheck, Search, Copy, Check, MessageSquare,
-  Sparkles, ShieldCheck
+  Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen
 } from 'lucide-react';
 import { 
   DEPARTMENTS, DepartmentType, WARD_OPTIONS, emergencyContacts 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  SearchResult, TaskItem, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule 
+  SearchResult, TaskItem, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule,
+  InternDoctor 
 } from '../types';
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
@@ -27,6 +28,7 @@ interface UserViewProps {
   pathologistSchedules: PathologistSchedule[];
   dutyPhones?: DutyPhoneItem[];
   cnGroupSchedules?: CNGroupSchedule[];
+  interns?: InternDoctor[];
   sheetsConfig: GoogleSheetsConfig;
   onSyncSheets: () => void;
   isSyncingSheets: boolean;
@@ -45,6 +47,7 @@ export const UserView: React.FC<UserViewProps> = ({
   pathologistSchedules,
   dutyPhones = [],
   cnGroupSchedules = [],
+  interns = [],
   sheetsConfig,
   onSyncSheets,
   isSyncingSheets
@@ -106,10 +109,12 @@ export const UserView: React.FC<UserViewProps> = ({
       customRules,
       pathologistSchedules,
       dutyPhones,
-      cnGroupSchedules
+      cnGroupSchedules,
+      interns,
+      tasks
     );
     setSearchResult(result);
-  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules, dutyPhones, cnGroupSchedules]);
+  }, [selectedDept, selectedWard, selectedTask, selectedDate, selectedTime, schedules, contacts, cnPosts, timeSlots, weeklyCNSchedule, customRules, pathologistSchedules, dutyPhones, cnGroupSchedules, interns, tasks]);
 
   const setToCurrentTime = () => {
     const iso = getLocalISOString();
@@ -380,6 +385,35 @@ export const UserView: React.FC<UserViewProps> = ({
         <div className="lg:col-span-7 space-y-5">
           {searchResult && (
             <>
+              {/* 5대 관리자 설정 연동 상태 인디케이터 바 */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 px-4 shadow-lg flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center gap-1.5 text-slate-400 font-bold">
+                  <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-slate-200">5대 관리자 설정 실시간 연동:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300 border border-slate-700">
+                    📅 당직표 ({selectedDate})
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 border border-slate-700">
+                    👥 전담 매트릭스 ({searchResult.matchedWardGroup || '병동군'})
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700">
+                    📞 연락망 ({interns.length}명)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-blue-300 border border-slate-700">
+                    📋 업무마스터 ({tasks.length}종)
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md border ${
+                    searchResult.matchedRuleName 
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
+                    ⚡ 규칙빌더 ({searchResult.matchedRuleName ? `적용: ${searchResult.matchedRuleName}` : `${customRules.length}개`})
+                  </span>
+                </div>
+              </div>
+
               {/* Primary Call Destination Hero Card */}
               <div className="glass-panel rounded-3xl p-6 border-2 border-cyan-500/60 bg-gradient-to-b from-cyan-950/30 via-slate-900 to-slate-900 shadow-2xl space-y-5 relative overflow-hidden">
                 
@@ -395,11 +429,17 @@ export const UserView: React.FC<UserViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {searchResult.ruleSource === 'DYNAMIC_RULE' && (
-                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        커스텀 관리자 규칙 적용됨
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {searchResult.matchedRuleName && (
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-300" />
+                        규칙 빌더: {searchResult.matchedRuleName}
+                      </span>
+                    )}
+
+                    {searchResult.matchedWardGroup && (
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        {searchResult.matchedWardGroup}
                       </span>
                     )}
 
@@ -408,7 +448,7 @@ export const UserView: React.FC<UserViewProps> = ({
                         ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
                         : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
                     }`}>
-                      {searchResult.isRegularHours ? '평일 정규근무 시간' : '정규 외/야간 당직근무'}
+                      {searchResult.isRegularHours ? '평일 정규근무' : '정규 외/야간 당직'}
                     </span>
                   </div>
                 </div>
@@ -512,6 +552,67 @@ export const UserView: React.FC<UserViewProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Task Master Routing Guidelines & Support Status Card */}
+              {searchResult.matchedTaskItem && (
+                <div className="glass-panel rounded-3xl p-5 border border-cyan-500/40 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/20 shadow-xl space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-cyan-400" />
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                        업무마스터 표준 지침 & 지원 기준
+                      </h4>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                        카테고리: {searchResult.matchedTaskItem.category}
+                      </span>
+                      {searchResult.matchedTaskItem.isNurseSupport === 'Y' || searchResult.matchedTaskItem.isNurseSupport === true ? (
+                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          전담간호사 지원 가능
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          전담간호 지원 불가 (의료진 전담)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Time Rule & Support Note */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5">시간대별 배정 원칙</span>
+                      <span className="font-extrabold text-cyan-200">
+                        {searchResult.matchedTaskItem.timeRuleType || '정규/당직 표준 규칙 준수'}
+                      </span>
+                    </div>
+                    {searchResult.matchedTaskItem.nurseSupportNote && (
+                      <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                        <span className="text-[10px] font-bold text-slate-400 block mb-0.5">전담간호 지원 비고</span>
+                        <span className="font-semibold text-slate-200">
+                          {searchResult.matchedTaskItem.nurseSupportNote}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detailed multiline description */}
+                  {searchResult.matchedTaskItem.description && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300 space-y-1.5">
+                      <span className="text-[10px] font-bold text-cyan-400 block uppercase tracking-wider flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        업무마스터 상세 호출 및 인계 기준
+                      </span>
+                      <div className="whitespace-pre-line leading-relaxed font-normal text-slate-200 pt-1">
+                        {searchResult.matchedTaskItem.description}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Backup Call Line Card (연락 두절 시 비상 백업) */}
               {searchResult.backupRole && (

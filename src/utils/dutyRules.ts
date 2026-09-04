@@ -3,7 +3,8 @@ import {
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
-  SearchResult, ContactInfo, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule 
+  SearchResult, ContactInfo, CustomRule, PathologistSchedule, DutyPhoneItem, CNGroupSchedule,
+  InternDoctor, TaskItem 
 } from '../types';
 import { checkKoreanHoliday } from './koreanHolidays';
 
@@ -67,7 +68,9 @@ export function evaluateDutyRules(
   customRules: CustomRule[] = [],
   pathologistSchedules: PathologistSchedule[] = [],
   dutyPhones: DutyPhoneItem[] = [],
-  cnGroupSchedules: CNGroupSchedule[] = []
+  cnGroupSchedules: CNGroupSchedule[] = [],
+  interns: InternDoctor[] = [],
+  tasks: TaskItem[] = []
 ): SearchResult {
   const holidayInfo = checkKoreanHoliday(selectedDate);
   const isWeekendOrHoliday = holidayInfo.isHolidayOrWeekend;
@@ -92,8 +95,28 @@ export function evaluateDutyRules(
   let dutyPhone: string | null = null;
   let dutyUcap: string | null = null;
   let ruleSource: 'DYNAMIC_RULE' | 'SYSTEM_DEFAULT' = 'SYSTEM_DEFAULT';
+  let matchedRuleName: string | undefined = undefined;
 
   const isTask = (keyword: string) => selectedTask.toLowerCase().includes(keyword.toLowerCase());
+
+  // 업무 마스터(Task Master) 매칭
+  const matchedTaskItem = tasks.find(t => 
+    t.name === selectedTask || 
+    t.name.replace(/\n/g, ' ') === selectedTask.replace(/\n/g, ' ') ||
+    selectedTask.toLowerCase().includes(t.name.split(' (')[0].toLowerCase())
+  );
+
+  // 병동 그룹군 분류
+  let matchedWardGroup = '';
+  if (selectedDept === '내과') {
+    if (WARD_GROUPS.GROUP_A.includes(selectedWard)) matchedWardGroup = '내과계 병동 Group 1 (MICU 등)';
+    else if (WARD_GROUPS.GROUP_B.includes(selectedWard)) matchedWardGroup = '내과계 병동 Group 2';
+    else matchedWardGroup = '내과계 기타 병동';
+  } else {
+    if (WARD_GROUPS.GROUP_C.includes(selectedWard)) matchedWardGroup = '비내과계 병동 Group C (SICU/외과계)';
+    else if (WARD_GROUPS.GROUP_D.includes(selectedWard)) matchedWardGroup = '비내과계 병동 Group D';
+    else matchedWardGroup = '비내과계 기타 병동';
+  }
 
   // =========================================================================
   // 우선순위 0: 관리자 동적 규칙 (Custom Rules from Rule Builder) 평가
@@ -134,10 +157,13 @@ export function evaluateDutyRules(
       if (!matchTask) continue;
     }
 
-    // 조건 모두 충족: 동적 규칙 적용
+    // 조건 모두 충족: 동적 규칙 적용 (관리자가 지정한 연락처/내선 반영)
     assignedRole = rule.action.assignedRole;
     backupRole = rule.action.backupRole || '';
     notes = rule.action.notes || '';
+    if (rule.action.dutyPhone) dutyPhone = rule.action.dutyPhone;
+    if (rule.action.dutyUcap) dutyUcap = rule.action.dutyUcap;
+    matchedRuleName = rule.name;
     ruleSource = 'DYNAMIC_RULE';
     break;
   }
@@ -166,13 +192,12 @@ export function evaluateDutyRules(
       assignedRole = '공통 전담간호사 & 당직의료진 (동시 호출)';
       notes = '병동 내 응급상황: 공통 전담간호사와 당직 의료진이 동시에 자동 호출됩니다.';
     }
-    else if (isTask('EKG')) {
+    else if (isTask('EKG') && (matchedPathologist || (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8))) {
+      assignedRole = ROLES.PATHOLOGIST;
       if (matchedPathologist) {
-        assignedRole = ROLES.PATHOLOGIST;
         const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
         notes = `${matchedPathologist.name} 임상병리사 순환일정 매칭 (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '08:00'})`;
-      } else if (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8) {
-        assignedRole = ROLES.PATHOLOGIST;
+      } else {
         notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
       }
     }
@@ -216,16 +241,16 @@ export function evaluateDutyRules(
           notes = 'Primary Call은 전담간호사가 우선 접수합니다.';
         } else if (isTask('ABGA') || isTask('Blood culture') || isTask('Line 채혈')) {
           if (selectedWard === 'MICU') {
-            assignedRole = ROLES.INTERN;
-            notes = '평일 정규시간 MICU ABGA/Line 채혈은 해당과 인턴 담당입니다.';
+            assignedRole = ROLES.IM_1;
+            notes = '평일 정규시간 MICU ABGA/Line 채혈은 내과 인턴(내과1) 담당입니다.';
           } else {
             assignedRole = ROLES.COMMON_NURSE;
             notes = '평일 정규시간 일반병동 ABGA/Line 채혈은 공통 전담간호사 연결입니다.';
           }
         } else {
-          // EKG(P), 수혈동의서, T-tube 교체 등 -> 해당과 인턴
-          assignedRole = ROLES.INTERN;
-          notes = '평일 정규시간 필수 술기는 해당 진료과 인턴 담당입니다.';
+          // EKG(P), 수혈동의서, T-tube 교체 등 -> 내과1 인턴
+          assignedRole = ROLES.IM_1;
+          notes = '평일 정규시간 필수 술기/심전도는 내과 인턴(내과1) 담당입니다.';
         }
       } else {
         // 정규시간 외 (평일 17:00~08:00, 주말/휴일 종일)
@@ -391,7 +416,8 @@ export function evaluateDutyRules(
 
   // 공통 전담간호사 매칭 세부 로직
   // 공통 전담간호사 매칭 세부 로직
-  if (assignedRole === ROLES.COMMON_NURSE) {
+  // 공통 전담간호사 및 당직 전담간호사 매칭 세부 로직 (공통전담간호 근무 매트릭스 연동)
+  if (assignedRole === ROLES.COMMON_NURSE || assignedRole === ROLES.DUTY_NURSE) {
     let targetTimeSlot: TimeSlot | null = null;
     const shiftDate = new Date(selectedDate);
 
@@ -411,6 +437,10 @@ export function evaluateDutyRules(
       }
     }
 
+    if (!targetTimeSlot && assignedRole === ROLES.DUTY_NURSE) {
+      targetTimeSlot = timeSlots.find(ts => ts.id === 'ts_night') || timeSlots[2] || null;
+    }
+
     const shiftDayOfWeek = shiftDate.getDay();
 
     // 1순위: 이미지 1 공식 통합 주간 근무표 (cnGroupSchedules)
@@ -428,8 +458,8 @@ export function evaluateDutyRules(
         const resolvedUcap = shiftCell.ucap || contact.ucap;
         const resolvedPhone = shiftCell.phone || contact.phone;
 
-        assignedRole = shiftCell.role || `${matchedGroup.title}`;
-        assignedPerson = `${shiftCell.role || '공통전담'} (${targetTimeSlot.name})`;
+        assignedRole = shiftCell.role || (assignedRole === ROLES.DUTY_NURSE ? '당직 전담간호사' : `${matchedGroup.title}`);
+        assignedPerson = `${shiftCell.role || '전담간호사'} (${targetTimeSlot.name})`;
         dutyUcap = resolvedUcap || null;
         dutyPhone = resolvedPhone || null;
         contactInfo = {
@@ -437,7 +467,7 @@ export function evaluateDutyRules(
           ucap: resolvedUcap || '정보 없음',
           dumcTalk: shiftCell.role || '공통전담간호사'
         };
-        notes = `${matchedGroup.title} (${selectedWard}) - ${targetTimeSlot.name} 배정`;
+        notes = `${matchedGroup.title} (${selectedWard}) - ${targetTimeSlot.name} 근무 매트릭스 자동 배정`;
       }
     }
 
@@ -459,7 +489,7 @@ export function evaluateDutyRules(
           dumcTalk: targetCN.dumcTalk || targetCN.name
         };
       } else {
-        assignedRole = '공통전담간호사 (배정정보 없음)';
+        assignedRole = assignedRole === ROLES.DUTY_NURSE ? '당직 전담간호사' : '공통전담간호사 (배정정보 없음)';
         assignedPerson = '당직표 확인 요망';
         notes = notes || '해당 시간대나 병동에 관리자가 배정한 공통전담간호사 정보가 없습니다.';
       }
@@ -496,6 +526,9 @@ export function evaluateDutyRules(
   }
   // 일반 인턴 및 당직의 매칭
   else if (assignedRole) {
+    if (assignedRole === ROLES.INTERN) {
+      assignedRole = selectedDept === '내과' ? ROLES.IM_1 : (WARD_GROUPS.GROUP_C.includes(selectedWard) ? ROLES.NON_IM_2 : ROLES.NON_IM_3);
+    }
     const todaysSchedule = schedules[selectedDate];
     if (todaysSchedule) {
       const doctor = getScheduleDoctor(todaysSchedule, assignedRole);
@@ -503,36 +536,63 @@ export function evaluateDutyRules(
         assignedPerson = doctor;
       }
     }
-    if ([ROLES.DUTY_NURSE, ROLES.INTERN].includes(assignedRole)) {
+    if (assignedRole === ROLES.DUTY_NURSE) {
       assignedPerson = assignedRole;
     }
+    if (assignedPerson === '미배정(근무표 확인)') {
+      // 선택 날짜에 당직표 입력이 없는 경우, 등록된 첫 번째 당직표 일정이나 interns 연락망의 전공의로 자동 매칭
+      const allScheds = Object.values(schedules);
+      for (const s of allScheds) {
+        const doc = getScheduleDoctor(s, assignedRole);
+        if (doc) {
+          assignedPerson = doc;
+          break;
+        }
+      }
+      if (assignedPerson === '미배정(근무표 확인)' && interns.length > 0) {
+        const deptIntern = interns.find(i => i.category === selectedDept || i.dept?.includes(selectedDept === '내과' ? 'IM' : 'GS'));
+        if (deptIntern) assignedPerson = deptIntern.name;
+      }
+    }
 
-    // Look up custom duty phone configured by admin (e.g. '비내과 1', '비내과 2', '비내과 3', '내과 1', etc.)
+    // 관리자 공용 당직폰 설정 조회
     const cleanAssigned = (assignedRole || '').replace(/\s+/g, '');
     const matchedDutyPhone = cleanAssigned ? dutyPhones.find(dp => {
       const cleanDp = dp.roleName.replace(/\s+/g, '');
       return cleanDp === cleanAssigned || cleanAssigned.includes(cleanDp) || cleanDp.includes(cleanAssigned);
     }) : undefined;
 
-    // 내과계 인턴: 개인 UCAP 및 개인폰 우선 매칭 (단, 공용 당직폰이 등록된 경우 당직폰 우선)
+    // 1순위: 관리자 의료진 연락망(interns)에서 전공의 성명 매칭하여 개인 UCAP 및 개인폰 실시간 조회
+    const matchedIntern = interns.find(it => it.name && assignedPerson && it.name.trim() === assignedPerson.trim());
+    if (matchedIntern) {
+      contactInfo = {
+        phone: matchedIntern.phone || '미등록',
+        ucap: matchedIntern.ucap || '미등록',
+        dumcTalk: `${matchedIntern.name}(${matchedIntern.dept || '전공의'})`
+      };
+    } else if (contacts[assignedPerson]) {
+      contactInfo = contacts[assignedPerson];
+    }
+
+    // 내과계 인턴: 개인 UCAP 및 개인폰 우선 (공용 당직폰이 지정된 경우 당직폰 우선)
     if (assignedRole === ROLES.IM_1 || assignedRole === ROLES.IM_2 || assignedRole?.includes('내과')) {
-      contactInfo = contacts[assignedPerson] || { phone: '미등록', ucap: '미등록' };
-      dutyUcap = (matchedDutyPhone && matchedDutyPhone.ucap) || contactInfo.ucap;
-      dutyPhone = (matchedDutyPhone && matchedDutyPhone.phone) || contactInfo.phone;
+      dutyUcap = dutyUcap || (matchedDutyPhone && matchedDutyPhone.ucap) || contactInfo.ucap;
+      dutyPhone = dutyPhone || (matchedDutyPhone && matchedDutyPhone.phone) || contactInfo.phone;
     } 
     // 비내과계 인턴: 공용 당직폰 번호 우선 연결
     else if (matchedDutyPhone && (matchedDutyPhone.phone || matchedDutyPhone.ucap)) {
-      dutyPhone = matchedDutyPhone.phone || DUTY_PHONES[assignedRole] || '010-7628-5803';
-      dutyUcap = matchedDutyPhone.ucap || DUTY_UCAPS[assignedRole] || '5-4080';
-      contactInfo = contacts[assignedPerson] || { phone: dutyPhone, ucap: dutyUcap };
+      dutyPhone = dutyPhone || matchedDutyPhone.phone || DUTY_PHONES[assignedRole] || '010-7628-5803';
+      dutyUcap = dutyUcap || matchedDutyPhone.ucap || DUTY_UCAPS[assignedRole] || '5-4080';
+      contactInfo = { phone: dutyPhone, ucap: dutyUcap, dumcTalk: contactInfo.dumcTalk || assignedPerson };
     }
     else if (DUTY_PHONES[assignedRole]) {
-      dutyPhone = DUTY_PHONES[assignedRole];
-      dutyUcap = DUTY_UCAPS[assignedRole];
-      contactInfo = contacts[assignedPerson] || { phone: dutyPhone, ucap: dutyUcap };
+      dutyPhone = dutyPhone || DUTY_PHONES[assignedRole];
+      dutyUcap = dutyUcap || DUTY_UCAPS[assignedRole];
+      contactInfo = { phone: dutyPhone, ucap: dutyUcap, dumcTalk: contactInfo.dumcTalk || assignedPerson };
     } 
     else {
-      contactInfo = contacts[assignedPerson] || contactInfo;
+      dutyPhone = dutyPhone || contactInfo.phone;
+      dutyUcap = dutyUcap || contactInfo.ucap;
     }
   }
 
@@ -571,7 +631,10 @@ export function evaluateDutyRules(
     backupContact1,
     backupContact2,
     notes,
-    ruleSource
+    ruleSource,
+    matchedRuleName,
+    matchedTaskItem,
+    matchedWardGroup
   };
 }
 

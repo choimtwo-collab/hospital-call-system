@@ -261,6 +261,7 @@ export default function App() {
             pathologistSchedules={pathologistSchedules}
             dutyPhones={dutyPhones}
             cnGroupSchedules={cnGroupSchedules}
+            interns={interns}
             sheetsConfig={sheetsConfig}
             onSyncSheets={() => handleSyncSheets()}
             isSyncingSheets={isSyncingSheets}
