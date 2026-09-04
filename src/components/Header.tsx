@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Shield, User, Clock, CheckCircle, Database } from 'lucide-react';
+import { Activity, Shield, User, Clock, Database } from 'lucide-react';
 
 interface HeaderProps {
   view: 'user' | 'admin';
   setView: (view: 'user' | 'admin') => void;
   onResetData?: () => void;
+  isCloudConnected?: boolean;
+  lastCloudSyncAt?: string | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  view, 
+  setView, 
+  isCloudConnected = false,
+  lastCloudSyncAt = null
+}) => {
   const [timeStr, setTimeStr] = useState<string>('');
 
   useEffect(() => {
@@ -49,8 +56,24 @@ export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
         </div>
 
         {/* Right Info & View Switcher */}
-        <div className="flex items-center gap-3 sm:gap-6">
+        <div className="flex items-center gap-2 sm:gap-4">
           
+          {/* Cloud DB Status Badge */}
+          <div 
+            title={isCloudConnected ? `Neon PostgreSQL 실시간 동기화 (최근: ${lastCloudSyncAt || '방금'})` : '클라우드 DB 연결 대기 중 (로컬 캐시 모드)'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+              isCloudConnected 
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+            }`}
+          >
+            <Database className={`w-3.5 h-3.5 ${isCloudConnected ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline">
+              {isCloudConnected ? 'Neon 실시간 동기화' : '로컬 캐시 모드'}
+            </span>
+            <span className={`w-2 h-2 rounded-full ${isCloudConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+          </div>
+
           {/* Live Clock Badge */}
           <div className="hidden lg:flex items-center gap-2 bg-slate-800/80 px-3.5 py-1.5 rounded-xl border border-slate-700/60 text-slate-300 text-xs font-semibold">
             <Clock className="w-3.5 h-3.5 text-cyan-400" />

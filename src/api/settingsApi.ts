@@ -40,6 +40,21 @@ export async function saveSetting(key: string, value: any): Promise<void> {
   }
 }
 
+const debounceTimers: Record<string, any> = {};
+
+/** 디바운스된 설정값 저장 (연속 입력 또는 빈번한 상태 변경 시 최적화) */
+export function saveSettingDebounced(key: string, value: any, delay = 400): void {
+  if (debounceTimers[key]) {
+    clearTimeout(debounceTimers[key]);
+  }
+  debounceTimers[key] = setTimeout(() => {
+    saveSetting(key, value).catch(err => {
+      console.error(`Neon DB 저장 실패 ("${key}"):`, err);
+    });
+    delete debounceTimers[key];
+  }, delay);
+}
+
 /** 설정값 삭제 */
 export async function deleteSetting(key: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/settings?key=${encodeURIComponent(key)}`, {

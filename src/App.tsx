@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { UserView } from './components/UserView';
 import { AdminView } from './components/AdminView';
@@ -10,8 +10,11 @@ import {
 } from './data/initialData';
 import { useSettings } from './context/SettingsContext';
 import { 
+  fetchAllSettings, subscribeToSettings, saveSettingDebounced 
+} from './api/settingsApi';
+import { 
   DateScheduleMap, ContactMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
-  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule, EmergencyContact, InternWardGroupSetting 
+  TaskItem, CustomRule, InternDoctor, PathologistSchedule, DutyPhoneItem, CNGroupSchedule
 } from './types';
 import { 
   GoogleSheetsConfig, DEFAULT_SHEETS_CONFIG, fetchGoogleSheetSchedules 
@@ -35,9 +38,32 @@ const STORAGE_KEYS = {
   INTERN_WARD_GROUPS: 'hcs_intern_ward_groups_v1'
 };
 
+const DB_KEYS = {
+  SCHEDULES: 'schedules',
+  CONTACTS: 'contacts',
+  TIME_SLOTS: 'time_slots',
+  CN_POSTS: 'cn_posts',
+  WEEKLY_CN: 'weekly_cn_schedule',
+  TASKS: 'tasks',
+  CUSTOM_RULES: 'custom_rules',
+  INTERNS: 'interns',
+  PATHOLOGISTS: 'pathologist_schedules',
+  SHEETS_CONFIG: 'sheets_config',
+  DUTY_ROLES: 'duty_roles',
+  DUTY_PHONES: 'duty_phones',
+  CN_GROUP_SCHEDULES: 'cn_group_schedules',
+  HOTLINES: 'hotlines',
+  INTERN_WARD_GROUPS: 'intern_ward_groups'
+};
+
 export default function App() {
   const [view, setView] = useState<'user' | 'admin'>('user');
   const { settings: neonSettings, updateInternWardGroups, updateHotlines } = useSettings();
+
+  const isInitialLoaded = useRef(false);
+  const isUpdatingFromRemote = useRef(false);
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
 
   // Lazy initialize state from LocalStorage or default initial dataset
   const [schedules, setSchedules] = useState<DateScheduleMap>(() => {
@@ -119,69 +145,105 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialCNGroupSchedules;
   });
 
-  // emergencyContactsList & internWardGroups are now from Neon via useSettings()
-  const emergencyContactsList = neonSettings.hotlines;
-  const internWardGroups = neonSettings.internWardGroups;
-
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
-  // Sync state to LocalStorage on change
+  // ─── 1. Neon DB 초기 로드 및 실시간 양방향 동기화 ───
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SCHEDULES, JSON.stringify(schedules));
-  }, [schedules]);
+    let isMounted = true;
 
-  // HOTLINES and INTERN_WARD_GROUPS are now synced via Neon API (SettingsContext)
+    async function loadFromNeon() {
+      try {
+        const { settings } = await fetchAllSettings();
+        if (!isMounted) return;
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DUTY_ROLES, JSON.stringify(dutyRoles));
-  }, [dutyRoles]);
+        isUpdatingFromRemote.current = true;
+        if (settings[DB_KEYS.SCHEDULES]) setSchedules(settings[DB_KEYS.SCHEDULES]);
+        if (settings[DB_KEYS.CONTACTS]) setContacts(settings[DB_KEYS.CONTACTS]);
+        if (settings[DB_KEYS.TIME_SLOTS]) setTimeSlots(settings[DB_KEYS.TIME_SLOTS]);
+        if (settings[DB_KEYS.CN_POSTS]) setCnPosts(settings[DB_KEYS.CN_POSTS]);
+        if (settings[DB_KEYS.WEEKLY_CN]) setWeeklyCNSchedule(settings[DB_KEYS.WEEKLY_CN]);
+        if (settings[DB_KEYS.TASKS]) setTasks(settings[DB_KEYS.TASKS]);
+        if (settings[DB_KEYS.CUSTOM_RULES]) setCustomRules(settings[DB_KEYS.CUSTOM_RULES]);
+        if (settings[DB_KEYS.INTERNS]) setInterns(settings[DB_KEYS.INTERNS]);
+        if (settings[DB_KEYS.PATHOLOGISTS]) setPathologistSchedules(settings[DB_KEYS.PATHOLOGISTS]);
+        if (settings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(settings[DB_KEYS.SHEETS_CONFIG]);
+        if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
+        if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
+        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
+        if (settings[DB_KEYS.HOTLINES]) updateHotlines(settings[DB_KEYS.HOTLINES]);
+        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DUTY_PHONES, JSON.stringify(dutyPhones));
-  }, [dutyPhones]);
+        setIsCloudConnected(true);
+        setLastCloudSyncAt(new Date().toLocaleTimeString());
+      } catch (err) {
+        console.warn('Neon DB 로드 실패 (로컬 캐시 사용):', err);
+        setIsCloudConnected(false);
+      } finally {
+        if (isMounted) {
+          isInitialLoaded.current = true;
+          setTimeout(() => { isUpdatingFromRemote.current = false; }, 600);
+        }
+      }
+    }
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CN_GROUP_SCHEDULES, JSON.stringify(cnGroupSchedules));
-  }, [cnGroupSchedules]);
+    loadFromNeon();
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
-  }, [contacts]);
+    // 5초 주기 폴링 + 포커스 복귀 시 실시간 동기화
+    const unsubscribe = subscribeToSettings((remoteSettings) => {
+      if (!isInitialLoaded.current) return;
+      isUpdatingFromRemote.current = true;
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TIME_SLOTS, JSON.stringify(timeSlots));
-  }, [timeSlots]);
+      if (remoteSettings[DB_KEYS.SCHEDULES]) setSchedules(remoteSettings[DB_KEYS.SCHEDULES]);
+      if (remoteSettings[DB_KEYS.CONTACTS]) setContacts(remoteSettings[DB_KEYS.CONTACTS]);
+      if (remoteSettings[DB_KEYS.TIME_SLOTS]) setTimeSlots(remoteSettings[DB_KEYS.TIME_SLOTS]);
+      if (remoteSettings[DB_KEYS.CN_POSTS]) setCnPosts(remoteSettings[DB_KEYS.CN_POSTS]);
+      if (remoteSettings[DB_KEYS.WEEKLY_CN]) setWeeklyCNSchedule(remoteSettings[DB_KEYS.WEEKLY_CN]);
+      if (remoteSettings[DB_KEYS.TASKS]) setTasks(remoteSettings[DB_KEYS.TASKS]);
+      if (remoteSettings[DB_KEYS.CUSTOM_RULES]) setCustomRules(remoteSettings[DB_KEYS.CUSTOM_RULES]);
+      if (remoteSettings[DB_KEYS.INTERNS]) setInterns(remoteSettings[DB_KEYS.INTERNS]);
+      if (remoteSettings[DB_KEYS.PATHOLOGISTS]) setPathologistSchedules(remoteSettings[DB_KEYS.PATHOLOGISTS]);
+      if (remoteSettings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(remoteSettings[DB_KEYS.SHEETS_CONFIG]);
+      if (remoteSettings[DB_KEYS.DUTY_ROLES]) setDutyRoles(remoteSettings[DB_KEYS.DUTY_ROLES]);
+      if (remoteSettings[DB_KEYS.DUTY_PHONES]) setDutyPhones(remoteSettings[DB_KEYS.DUTY_PHONES]);
+      if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]);
+      if (remoteSettings[DB_KEYS.HOTLINES]) updateHotlines(remoteSettings[DB_KEYS.HOTLINES]);
+      if (remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CN_POSTS, JSON.stringify(cnPosts));
-  }, [cnPosts]);
+      setIsCloudConnected(true);
+      setLastCloudSyncAt(new Date().toLocaleTimeString());
+      setTimeout(() => { isUpdatingFromRemote.current = false; }, 600);
+    });
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_CN, JSON.stringify(weeklyCNSchedule));
-  }, [weeklyCNSchedule]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [updateHotlines, updateInternWardGroups]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
-  }, [tasks]);
+  // ─── 2. 로컬스토리지 저장 + Neon DB 자동 동기화 헬퍼 ───
+  const syncState = useCallback((storageKey: string, dbKey: string, value: any) => {
+    localStorage.setItem(storageKey, JSON.stringify(value));
+    if (isInitialLoaded.current && !isUpdatingFromRemote.current) {
+      saveSettingDebounced(dbKey, value);
+    }
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CUSTOM_RULES, JSON.stringify(customRules));
-  }, [customRules]);
+  useEffect(() => { syncState(STORAGE_KEYS.SCHEDULES, DB_KEYS.SCHEDULES, schedules); }, [schedules, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.DUTY_ROLES, DB_KEYS.DUTY_ROLES, dutyRoles); }, [dutyRoles, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.DUTY_PHONES, DB_KEYS.DUTY_PHONES, dutyPhones); }, [dutyPhones, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.CN_GROUP_SCHEDULES, DB_KEYS.CN_GROUP_SCHEDULES, cnGroupSchedules); }, [cnGroupSchedules, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.CONTACTS, DB_KEYS.CONTACTS, contacts); }, [contacts, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.TIME_SLOTS, DB_KEYS.TIME_SLOTS, timeSlots); }, [timeSlots, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.CN_POSTS, DB_KEYS.CN_POSTS, cnPosts); }, [cnPosts, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.WEEKLY_CN, DB_KEYS.WEEKLY_CN, weeklyCNSchedule); }, [weeklyCNSchedule, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.TASKS, DB_KEYS.TASKS, tasks); }, [tasks, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.CUSTOM_RULES, DB_KEYS.CUSTOM_RULES, customRules); }, [customRules, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.INTERNS, DB_KEYS.INTERNS, interns); }, [interns, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.PATHOLOGISTS, DB_KEYS.PATHOLOGISTS, pathologistSchedules); }, [pathologistSchedules, syncState]);
+  useEffect(() => { syncState(STORAGE_KEYS.SHEETS_CONFIG, DB_KEYS.SHEETS_CONFIG, sheetsConfig); }, [sheetsConfig, syncState]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.INTERNS, JSON.stringify(interns));
-  }, [interns]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PATHOLOGISTS, JSON.stringify(pathologistSchedules));
-  }, [pathologistSchedules]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SHEETS_CONFIG, JSON.stringify(sheetsConfig));
-  }, [sheetsConfig]);
-
-  // Google Sheets Sync Action
+  // ─── 3. Google Sheets Sync Action ───
   const handleSyncSheets = useCallback(async (customUrl?: string, customName?: string) => {
     const targetUrl = customUrl || sheetsConfig.sheetUrl;
     const targetName = customName || sheetsConfig.sheetName || '당직표';
@@ -209,19 +271,14 @@ export default function App() {
     }
   }, [sheetsConfig]);
 
-  // Periodic Auto-Sync Effect
+  // Periodic Auto-Sync Effect for Google Sheets
   useEffect(() => {
     if (!sheetsConfig.enabled || !sheetsConfig.sheetUrl) return;
-
-    // Initial sync on app start
     handleSyncSheets();
-
-    // Auto-sync interval
     const intervalMinutes = Math.max(1, sheetsConfig.autoSyncMinutes || 5);
     const timer = setInterval(() => {
       handleSyncSheets();
     }, intervalMinutes * 60 * 1000);
-
     return () => clearInterval(timer);
   }, [sheetsConfig.enabled, sheetsConfig.sheetUrl, sheetsConfig.autoSyncMinutes, handleSyncSheets]);
 
@@ -243,6 +300,21 @@ export default function App() {
     setCnGroupSchedules(initialCNGroupSchedules);
     updateHotlines(emergencyContacts);
     updateInternWardGroups(initialInternWardGroups);
+
+    // Neon DB에도 기본값 저장
+    saveSettingDebounced(DB_KEYS.SCHEDULES, initialSchedules);
+    saveSettingDebounced(DB_KEYS.CONTACTS, initialContacts);
+    saveSettingDebounced(DB_KEYS.TIME_SLOTS, initialTimeSlots);
+    saveSettingDebounced(DB_KEYS.CN_POSTS, initialCNPosts);
+    saveSettingDebounced(DB_KEYS.WEEKLY_CN, initialWeeklyCNSchedule);
+    saveSettingDebounced(DB_KEYS.TASKS, initialTasks);
+    saveSettingDebounced(DB_KEYS.CUSTOM_RULES, initialCustomRules);
+    saveSettingDebounced(DB_KEYS.INTERNS, initialInterns);
+    saveSettingDebounced(DB_KEYS.PATHOLOGISTS, initialPathologistSchedules);
+    saveSettingDebounced(DB_KEYS.SHEETS_CONFIG, DEFAULT_SHEETS_CONFIG);
+    saveSettingDebounced(DB_KEYS.DUTY_ROLES, initialDutyRoles);
+    saveSettingDebounced(DB_KEYS.DUTY_PHONES, initialDutyPhones);
+    saveSettingDebounced(DB_KEYS.CN_GROUP_SCHEDULES, initialCNGroupSchedules);
   };
 
   return (
@@ -257,7 +329,13 @@ export default function App() {
       )}
 
       {/* Header Bar */}
-      <Header view={view} setView={setView} onResetData={handleResetData} />
+      <Header 
+        view={view} 
+        setView={setView} 
+        onResetData={handleResetData}
+        isCloudConnected={isCloudConnected}
+        lastCloudSyncAt={lastCloudSyncAt}
+      />
 
       {/* Main Workspace View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -328,10 +406,10 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {sheetsConfig.enabled ? (
+            {isCloudConnected ? (
               <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                구글 시트 실시간 연동 활성
+                Neon 클라우드 DB 연동 중 (실시간)
               </span>
             ) : (
               <span className="text-slate-500">로컬 데이터 모드</span>

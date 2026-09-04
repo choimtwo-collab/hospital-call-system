@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import url from 'url';
 
 // Vite 로컬 개발 서버용 Serverless API 미들웨어 플러그인
 function vercelApiPlugin() {
@@ -8,7 +7,7 @@ function vercelApiPlugin() {
     name: 'vercel-api-plugin',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const parsedUrl = url.parse(req.url, true);
+        const parsedUrl = new URL(req.url || '', 'http://localhost:3000');
         if (parsedUrl.pathname === '/api/settings') {
           try {
             // body 파싱 (POST/PUT/DELETE)
@@ -24,7 +23,7 @@ function vercelApiPlugin() {
                   (req as any).body = body;
                 }
               }
-              (req as any).query = parsedUrl.query;
+              (req as any).query = Object.fromEntries(parsedUrl.searchParams);
 
               // res.status, res.json 헬퍼 추가
               (res as any).status = (statusCode: number) => {
