@@ -560,9 +560,16 @@ export function evaluateDutyRules(
     if (matchedGroup && targetTimeSlot) {
       const shiftCell = matchedGroup.schedule?.[targetTimeSlot.id]?.[shiftDayOfWeek];
       if (shiftCell && (shiftCell.ucap || shiftCell.role)) {
-        const contact = getCNPostContact(shiftCell.role, cnPosts);
-        const resolvedUcap = shiftCell.ucap || contact.ucap;
-        const resolvedPhone = shiftCell.phone || contact.phone;
+        const effectiveRole = shiftCell.role || assignedRole || '';
+        const contact = getCNPostContact(effectiveRole, cnPosts);
+        
+        // ★ 관리자 포스트 마스터(cnPosts)에서 변경한 최신 연락처가 최우선으로 반영됨!
+        const resolvedUcap = (contact.ucap && contact.ucap.trim()) 
+          ? contact.ucap.trim() 
+          : (shiftCell.ucap?.trim() || '');
+        const resolvedPhone = (contact.phone && contact.phone.trim()) 
+          ? contact.phone.trim() 
+          : (shiftCell.phone?.trim() || '');
 
         assignedRole = shiftCell.role || (assignedRole === ROLES.DUTY_NURSE ? '당직 전담간호사' : `${matchedGroup.title}`);
         assignedPerson = `${shiftCell.role || '전담간호사'} (${targetTimeSlot.name})`;
@@ -577,9 +584,23 @@ export function evaluateDutyRules(
       }
     }
 
-    // 2순위: 기존 포스트 기준 매칭 fallback
+    // 2순위: 지정된 역할명(assignedRole)으로 cnPosts 직접 매칭
+    if (!dutyUcap && !contactInfo.ucap && assignedRole) {
+      const directContact = getCNPostContact(assignedRole, cnPosts);
+      if (directContact.ucap || directContact.phone) {
+        dutyUcap = directContact.ucap || null;
+        dutyPhone = directContact.phone || null;
+        contactInfo = {
+          phone: directContact.phone || '정보 없음',
+          ucap: directContact.ucap || '정보 없음',
+          dumcTalk: assignedRole
+        };
+      }
+    }
+
+    // 3순위: 기존 포스트 기준 매칭 fallback
     if (!dutyUcap && !contactInfo.ucap) {
-      const targetCN = cnPosts.find(cn => cn.wards.includes(selectedWard));
+      const targetCN = cnPosts.find(cn => cn.wards.some(w => areWardsEqual(w, selectedWard)));
       if (targetCN && targetTimeSlot) {
         const scheduleForDay = weeklyCNSchedule[shiftDayOfWeek] || {};
         const scheduleForSlot = scheduleForDay[targetTimeSlot.id] || {};

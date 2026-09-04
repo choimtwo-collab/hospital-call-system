@@ -658,20 +658,27 @@ export const areWardsEqual = (w1?: string, w2?: string): boolean => {
 };
 
 export const getCNPostContact = (roleName: string, cnPosts: CNPost[]): { ucap: string; phone: string } => {
-  if (!roleName) return { ucap: '', phone: '' };
-  const clean = roleName.replace(/\s+/g, '');
+  if (!roleName || !cnPosts || cnPosts.length === 0) return { ucap: '', phone: '' };
+  const clean = roleName.replace(/\s+/g, '').toLowerCase();
+  
+  // 1. 포스트 명칭 전체 매칭 (예: '공통전담1' vs '공통전담 1')
   const found = cnPosts.find(p => {
-    const pClean = p.name.replace(/\s+/g, '');
+    const pClean = p.name.replace(/\s+/g, '').toLowerCase();
     return pClean === clean || clean.includes(pClean) || pClean.includes(clean);
   });
   if (found) {
-    return { ucap: found.ucap, phone: found.phone };
+    return { ucap: (found.ucap || '').trim(), phone: (found.phone || '').trim() };
   }
+
+  // 2. 번호 기반 매칭 (예: '공통전담 2' -> 2 추출 후 'CN2' 또는 '공통전담2' 검색)
   const matchNum = roleName.match(/\d+/);
   if (matchNum) {
     const num = matchNum[0];
-    const foundByNum = cnPosts.find(p => p.name.includes(num) || p.id === `CN${num}`);
-    if (foundByNum) return { ucap: foundByNum.ucap, phone: foundByNum.phone };
+    const foundByNum = cnPosts.find(p => {
+      const pClean = p.name.replace(/\s+/g, '').toLowerCase();
+      return pClean.includes(num) || p.id.toLowerCase() === `cn${num}`;
+    });
+    if (foundByNum) return { ucap: (foundByNum.ucap || '').trim(), phone: (foundByNum.phone || '').trim() };
   }
   return { ucap: '', phone: '' };
 };

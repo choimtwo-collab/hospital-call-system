@@ -393,7 +393,41 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   const handleUpdateCNPost = (id: string, field: keyof CNPost, value: any) => {
-    setCnPosts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+    setCnPosts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, [field]: value } : p);
+      // UCAP 또는 핸드폰 번호 변경 시 cnGroupSchedules 내의 해당 포스트 셀들의 UCAP/phone도 실시간 연동
+      if ((field === 'ucap' || field === 'phone') && setCnGroupSchedules) {
+        const targetPost = updated.find(p => p.id === id);
+        if (targetPost) {
+          const cleanName = targetPost.name.replace(/\s+/g, '').toLowerCase();
+          setCnGroupSchedules(prevGroups => prevGroups.map(grp => {
+            let hasChange = false;
+            const newSchedule = { ...grp.schedule };
+            Object.keys(newSchedule).forEach(slotId => {
+              const slotDays = { ...(newSchedule[slotId] || {}) };
+              Object.keys(slotDays).forEach(dayStr => {
+                const day = Number(dayStr);
+                const cell = slotDays[day];
+                if (cell && cell.role) {
+                  const cleanRole = cell.role.replace(/\s+/g, '').toLowerCase();
+                  if (cleanRole === cleanName || cleanRole.includes(cleanName) || cleanName.includes(cleanRole)) {
+                    hasChange = true;
+                    slotDays[day] = {
+                      ...cell,
+                      ucap: field === 'ucap' ? String(value).trim() : cell.ucap,
+                      phone: field === 'phone' ? String(value).trim() : cell.phone,
+                    };
+                  }
+                }
+              });
+              newSchedule[slotId] = slotDays;
+            });
+            return hasChange ? { ...grp, schedule: newSchedule } : grp;
+          }));
+        }
+      }
+      return updated;
+    });
   };
 
   const handleToggleWardForPost = (postId: string, ward: string) => {
@@ -3489,13 +3523,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     포스트별 공용 UCAP과 핸드폰 번호를 입력하고, 담당할 병동을 셋팅하거나 새 포스트를 추가/삭제합니다.
                   </p>
                 </div>
-                <button
-                  onClick={handleAddCNPost}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition shrink-0"
-                >
-                  <Plus className="w-4 h-4" />
-                  새 공통전담 포스트 추가
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    입력 즉시 간호사 뷰 및 DB 실시간 동기화
+                  </span>
+                  <button
+                    onClick={handleAddCNPost}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    새 공통전담 포스트 추가
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-800">
