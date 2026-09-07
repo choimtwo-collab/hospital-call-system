@@ -40,6 +40,15 @@ export default async function handler(req, res) {
 
     // ─── GET: 모든 설정 또는 특정 키 조회 ───
     if (req.method === 'GET') {
+      // Vercel Edge CDN 캐싱: 60초 동안 CDN 캐시 사용 (수백 명 동시 접속 시에도 Neon DB 쿼리 99% 차단)
+      // fresh=true 요청 시에만 캐시를 우회하여 Neon DB에서 직접 조회
+      const isFresh = req.query?.fresh === 'true';
+      if (!isFresh) {
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+      } else {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+
       const { key } = req.query || {};
       if (key) {
         const rows = await sql`SELECT value, updated_at FROM admin_settings WHERE key = ${key}`;

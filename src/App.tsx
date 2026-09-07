@@ -318,7 +318,7 @@ export default function App() {
   // 수동 Neon 클라우드 최신 동기화 (헤더 뱃지 클릭 시)
   const handleManualCloudSync = useCallback(async () => {
     try {
-      const { settings } = await fetchAllSettings();
+      const { settings } = await fetchAllSettings(true);
       if (settings) {
         if (settings[DB_KEYS.SCHEDULES]) setSchedules(settings[DB_KEYS.SCHEDULES]);
         if (settings[DB_KEYS.CONTACTS]) setContacts(settings[DB_KEYS.CONTACTS]);

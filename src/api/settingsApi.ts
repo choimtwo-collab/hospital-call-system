@@ -6,11 +6,11 @@ const API_URL = (typeof window !== 'undefined' && window.location.hostname === '
 
 // ─── REST API 호출 ───
 
-/** 모든 설정값 조회 */
-export async function fetchAllSettings(): Promise<{ settings: Record<string, any>; updated_at?: string }> {
-  const res = await fetch(`${API_URL}/api/settings`, {
-    headers: { 'Cache-Control': 'no-cache' },
-  });
+/** 모든 설정값 조회 (fresh = true일 때만 CDN 캐시를 우회하여 Neon DB 직접 조회) */
+export async function fetchAllSettings(fresh = false): Promise<{ settings: Record<string, any>; updated_at?: string }> {
+  const url = fresh ? `${API_URL}/api/settings?fresh=true` : `${API_URL}/api/settings`;
+  const headers: Record<string, string> = fresh ? { 'Cache-Control': 'no-cache' } : {};
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Failed to fetch settings: ${res.statusText}`);
   const data = await res.json();
   // data 구조: { settings: { key: value, ... }, updated_at: ... } 또는 구버전 fallback
@@ -21,10 +21,12 @@ export async function fetchAllSettings(): Promise<{ settings: Record<string, any
 }
 
 /** 특정 키의 설정값 조회 */
-export async function fetchSetting(key: string): Promise<any> {
-  const res = await fetch(`${API_URL}/api/settings?key=${encodeURIComponent(key)}`, {
-    headers: { 'Cache-Control': 'no-cache' },
-  });
+export async function fetchSetting(key: string, fresh = false): Promise<any> {
+  const url = fresh
+    ? `${API_URL}/api/settings?key=${encodeURIComponent(key)}&fresh=true`
+    : `${API_URL}/api/settings?key=${encodeURIComponent(key)}`;
+  const headers: Record<string, string> = fresh ? { 'Cache-Control': 'no-cache' } : {};
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Failed to fetch setting "${key}": ${res.statusText}`);
   const data = await res.json();
   return data.value;
