@@ -784,11 +784,32 @@ export const UserView: React.FC<UserViewProps> = ({
                 <a
                   key={contact.id}
                   href={`tel:${contact.ucap}`}
-                  className="p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 transition flex flex-col justify-between"
+                  className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 transition flex flex-col justify-between group shadow-sm hover:shadow-cyan-500/10"
                 >
-                  <div className="text-[10px] font-bold text-slate-500">{contact.dept}</div>
-                  <div className="font-bold text-white truncate">{contact.name}</div>
-                  <div className="text-xs font-black text-cyan-400 mt-1">UCAP {contact.ucap}</div>
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-medium text-slate-400 truncate">{contact.dept}</span>
+                      {contact.category && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-800/80 text-cyan-400 border border-slate-700/50 flex-shrink-0">
+                          {contact.category}
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-bold text-white group-hover:text-cyan-200 transition text-[13px] leading-tight">
+                      {contact.name}
+                    </div>
+                    {contact.notes && (
+                      <div className="mt-1.5 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-normal leading-snug break-words">
+                        {contact.notes}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+                    <span className="text-xs font-black text-cyan-400">UCAP {contact.ucap}</span>
+                    {contact.phone && contact.phone !== '-' && (
+                      <span className="text-[10px] font-mono text-slate-400">{contact.phone}</span>
+                    )}
+                  </div>
                 </a>
               ))}
             </div>

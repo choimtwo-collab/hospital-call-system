@@ -186,6 +186,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [newHotlineName, setNewHotlineName] = useState('');
   const [newHotlineUcap, setNewHotlineUcap] = useState('');
   const [newHotlinePhone, setNewHotlinePhone] = useState('');
+  const [newHotlineNotes, setNewHotlineNotes] = useState('');
   const [newHotlineCategory, setNewHotlineCategory] = useState<'ER' | 'OR' | 'ICU' | 'LAB' | 'ADMIN'>('ER');
 
   const showSaveSuccess = (msg: string) => {
@@ -865,7 +866,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
       name: newHotlineName.trim(),
       ucap: newHotlineUcap.trim(),
       phone: newHotlinePhone.trim() || '-',
-      category: newHotlineCategory
+      category: newHotlineCategory,
+      notes: newHotlineNotes.trim() || undefined
     };
     if (setEmergencyContacts) {
       setEmergencyContacts([...(emergencyContacts || []), newContact]);
@@ -874,6 +876,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setNewHotlineName('');
     setNewHotlineUcap('');
     setNewHotlinePhone('');
+    setNewHotlineNotes('');
     showSaveSuccess(`새 핫라인 [${newContact.dept} - ${newContact.name}]이(가) 등록되었습니다.`);
   };
 
@@ -4506,6 +4509,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       <div className="text-sm font-bold text-white group-hover:text-cyan-200 transition">
                         {contact.name}
                       </div>
+                      {contact.notes && (
+                        <div className="mt-1 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-normal line-clamp-1">
+                          {contact.notes}
+                        </div>
+                      )}
                     </div>
                     <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800/60">
                       <div className="text-xs font-mono font-bold text-cyan-400 flex items-center gap-1">
@@ -4590,13 +4598,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </select>
               </div>
 
-              <div className="sm:col-span-2 lg:col-span-6 flex justify-end mt-1">
+              <div className="sm:col-span-2 lg:col-span-5">
+                <label className="block text-[11px] font-bold text-amber-300/90 mb-1">비고 (선택사항, 예: 호출 대상, 야간전담, 특이사항)</label>
+                <input
+                  type="text"
+                  placeholder="예: 야간 전담, CPR 긴급 호출용, 17시 이후 문의 등"
+                  value={newHotlineNotes}
+                  onChange={(e) => setNewHotlineNotes(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-amber-200 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-1 flex items-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition transform active:scale-95"
+                  className="w-full h-[38px] flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs px-4 rounded-xl shadow-lg shadow-cyan-500/20 transition transform active:scale-95 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4" />
-                  핫라인 추가 등록
+                  핫라인 추가
                 </button>
               </div>
             </form>
@@ -4617,16 +4636,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-left border-collapse min-w-[700px]">
+              <table className="w-full text-left border-collapse min-w-[840px]">
                 <thead>
                   <tr className="bg-slate-950/80 text-[11px] font-bold text-slate-400 border-b border-slate-800">
                     <th className="py-3 px-4 w-12 text-center">번호</th>
-                    <th className="py-3 px-4 w-32">분류</th>
-                    <th className="py-3 px-4 w-36">부서 / 소속</th>
-                    <th className="py-3 px-4">파트명 (표시 이름)</th>
-                    <th className="py-3 px-4 w-44">UCAP 내선번호</th>
-                    <th className="py-3 px-4 w-44">비상 휴대전화</th>
-                    <th className="py-3 px-4 w-20 text-center">삭제</th>
+                    <th className="py-3 px-4 w-28">분류</th>
+                    <th className="py-3 px-4 w-32">부서 / 소속</th>
+                    <th className="py-3 px-4 w-40">파트명 (표시 이름)</th>
+                    <th className="py-3 px-4 w-36">UCAP 내선번호</th>
+                    <th className="py-3 px-4 w-36">비상 휴대전화</th>
+                    <th className="py-3 px-4 min-w-[160px]">비고 (간호사 뷰 노출)</th>
+                    <th className="py-3 px-4 w-16 text-center">삭제</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -4681,6 +4701,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-cyan-500 w-full"
                         />
                       </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={contact.notes || ''}
+                          placeholder="비고 / 특이사항 입력"
+                          onChange={(e) => handleUpdateHotline(contact.id, 'notes', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/70 rounded-lg px-2.5 py-1.5 text-xs text-amber-200 placeholder-slate-600 focus:outline-none focus:border-amber-400 w-full"
+                        />
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <button
                           onClick={() => handleDeleteHotline(contact.id, contact.name)}
@@ -4694,7 +4723,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   ))}
                   {emergencyContacts.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-500 text-xs">
+                      <td colSpan={8} className="text-center py-8 text-slate-500 text-xs">
                         등록된 주요 핫라인이 없습니다. 위의 등록 폼에서 새로운 번호를 추가하거나 상단의 [표준 기본값 복원]을 눌러주세요.
                       </td>
                     </tr>

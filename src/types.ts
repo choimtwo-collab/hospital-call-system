@@ -83,6 +83,7 @@ export interface EmergencyContact {
   ucap: string;
   phone: string;
   category: 'ER' | 'OR' | 'ICU' | 'LAB' | 'ADMIN';
+  notes?: string;
 }
 
 export type SpecialtyType = '내과계' | '비내과계' | '공통';
