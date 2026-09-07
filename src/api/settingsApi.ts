@@ -1,5 +1,8 @@
-// src/api/settingsApi.ts — Vercel Serverless + Neon API 연동 클라이언트
-const API_URL = (import.meta as any).env?.VITE_API_URL || '';
+const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
+// 로컬 개발 환경에서 별도의 3001 포트 서버가 없을 경우 Vite 내장 미들웨어(상대 경로 '')로 안전하게 fallback
+const API_URL = (typeof window !== 'undefined' && window.location.hostname === 'localhost' && rawApiUrl.includes(':3001') && window.location.port !== '3001')
+  ? ''
+  : rawApiUrl;
 
 // ─── REST API 호출 ───
 

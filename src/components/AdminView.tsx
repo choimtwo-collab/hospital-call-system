@@ -22,6 +22,7 @@ import { CalendarDutyView } from './CalendarDutyView';
 import { getScheduleDoctor } from '../utils/dutyRules';
 import { AdminUserManagement } from './AdminUserManagement';
 import { AppUser, AdminTabId } from '../types';
+import { saveSetting } from '../api/settingsApi';
 
 interface AdminViewProps {
   schedules: DateScheduleMap;
@@ -286,13 +287,45 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
   };
 
-  // --- Pathologist Handlers ---
-  const handleAddPathologistSchedule = () => {
-    const today = new Date().toISOString().split('T')[0];
+  // --- Pathologist Handlers & Real-time Neon Sync ---
+  const [isSavingPathologist, setIsSavingPathologist] = useState(false);
+
+  const handleSavePathologistSchedules = async (customList?: PathologistSchedule[]) => {
+    const target = customList || pathologistSchedules;
+    setIsSavingPathologist(true);
+    try {
+      localStorage.setItem('hcs_pathologists_v1', JSON.stringify(target));
+      await saveSetting('pathologist_schedules', target);
+      showSaveSuccess('임상병리사 순환 일정이 Neon DB에 성공적으로 동기화되었습니다!');
+    } catch (err: any) {
+      console.error('Neon DB 임상병리사 일정 저장 오류:', err);
+      alert('Neon DB 저장 중 오류가 발생했습니다: ' + (err.message || err));
+    } finally {
+      setIsSavingPathologist(false);
+    }
+  };
+
+  const handleAddPathologistSchedule = async () => {
+    let defaultStart = new Date().toISOString().split('T')[0];
+    let defaultEnd = defaultStart;
+    if (pathologistSchedules.length > 0) {
+      const last = pathologistSchedules[pathologistSchedules.length - 1];
+      if (last.endDate) {
+        try {
+          const nextDay = new Date(last.endDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          defaultStart = nextDay.toISOString().split('T')[0];
+          const nextEnd = new Date(nextDay);
+          nextEnd.setDate(nextEnd.getDate() + 14);
+          defaultEnd = nextEnd.toISOString().split('T')[0];
+        } catch (e) {}
+      }
+    }
+
     const newPath: PathologistSchedule = {
       id: `path-${Date.now()}`,
-      startDate: today,
-      endDate: today,
+      startDate: defaultStart,
+      endDate: defaultEnd,
       dayType: 'WEEKDAY',
       startTime: '06:00',
       endTime: '08:00',
@@ -300,14 +333,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
       phone: '',
       ucap: ''
     };
-    setPathologistSchedules(prev => [...prev, newPath]);
-    showSaveSuccess('새 임상병리사 순환 일정이 추가되었습니다.');
+    const updated = [...pathologistSchedules, newPath];
+    setPathologistSchedules(updated);
+    await handleSavePathologistSchedules(updated);
   };
 
-  const handleDeletePathologistSchedule = (id: string) => {
+  const handleDeletePathologistSchedule = async (id: string) => {
     if (confirm('이 임상병리사 일정을 삭제하시겠습니까?')) {
-      setPathologistSchedules(prev => prev.filter(p => p.id !== id));
-      showSaveSuccess('임상병리사 일정이 삭제되었습니다.');
+      const updated = pathologistSchedules.filter(p => p.id !== id);
+      setPathologistSchedules(updated);
+      await handleSavePathologistSchedules(updated);
     }
   };
 
@@ -2884,22 +2919,42 @@ export const AdminView: React.FC<AdminViewProps> = ({
           <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Users className="w-5 h-5 text-cyan-400" />
-                  임상병리사 정규 EKG 순환 일정 관리
-                </h3>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <Users className="w-5 h-5 text-cyan-400" />
+                    임상병리사 정규 EKG 순환 일정 관리
+                  </h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Neon DB 실시간 동기화
+                  </span>
+                </div>
                 <p className="text-xs text-slate-400 mt-1">
                   기간(시작일~종료일), 근무 구분(평일/공휴일/매일), 담당 시간대(시작~종료)를 관리자가 직접 조정할 수 있습니다.
                 </p>
               </div>
 
-              <button
-                onClick={handleAddPathologistSchedule}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                순환 일정 추가
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleSavePathologistSchedules()}
+                  disabled={isSavingPathologist}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition disabled:opacity-50"
+                  title="현재 수정된 모든 일정을 Neon DB에 즉시 저장합니다"
+                >
+                  <Save className={`w-3.5 h-3.5 ${isSavingPathologist ? 'animate-spin' : ''}`} />
+                  {isSavingPathologist ? '저장 중...' : '임상병리사 일정 저장'}
+                </button>
+
+                <button
+                  onClick={handleAddPathologistSchedule}
+                  disabled={isSavingPathologist}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition disabled:opacity-50"
+                  title="새로운 순환 일정을 추가하고 Neon DB에 즉시 반영합니다"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  순환 일정 추가
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -2928,6 +2983,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               const val = e.target.value;
                               setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, startDate: val } : item));
                             }}
+                            onBlur={() => handleSavePathologistSchedules()}
                             className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
                           />
                           <span className="text-slate-500 font-bold">~</span>
@@ -2938,6 +2994,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               const val = e.target.value;
                               setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, endDate: val } : item));
                             }}
+                            onBlur={() => handleSavePathologistSchedules()}
                             className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
                           />
                         </div>
@@ -2949,7 +3006,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           value={p.dayType || 'WEEKDAY'}
                           onChange={e => {
                             const val = e.target.value as any;
-                            setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, dayType: val } : item));
+                            const updated = pathologistSchedules.map((item, i) => i === idx ? { ...item, dayType: val } : item);
+                            setPathologistSchedules(updated);
+                            handleSavePathologistSchedules(updated);
                           }}
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
                         >
@@ -2969,6 +3028,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               const val = e.target.value;
                               setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, startTime: val } : item));
                             }}
+                            onBlur={() => handleSavePathologistSchedules()}
                             className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-cyan-400"
                           />
                           <span className="text-slate-500 font-bold">~</span>
@@ -2979,6 +3039,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               const val = e.target.value;
                               setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, endTime: val } : item));
                             }}
+                            onBlur={() => handleSavePathologistSchedules()}
                             className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-cyan-400"
                           />
                         </div>
@@ -2994,6 +3055,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, name: val } : item));
                           }}
+                          onBlur={() => handleSavePathologistSchedules()}
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
                         />
                       </td>
@@ -3008,6 +3070,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, phone: val } : item));
                           }}
+                          onBlur={() => handleSavePathologistSchedules()}
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                         />
                       </td>
@@ -3022,6 +3085,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             const val = e.target.value;
                             setPathologistSchedules(prev => prev.map((item, i) => i === idx ? { ...item, ucap: val } : item));
                           }}
+                          onBlur={() => handleSavePathologistSchedules()}
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
                         />
                       </td>
@@ -3031,7 +3095,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <button
                           onClick={() => handleDeletePathologistSchedule(p.id)}
                           className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
-                          title="일정 삭제"
+                          title="일정 삭제 및 Neon DB 즉시 동기화"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -3040,6 +3104,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pathologist Guide Banner */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  💡 <strong>자동 매칭 안내:</strong> 간호사 화면에서 <strong>정규 EKG</strong> 호출 시, 설정된 기간 및 시간대(기본 06:00~08:00)에 해당하는 임상병리사가 최우선 자동 배정됩니다. (설정 시간 외에는 해당 병동 당직 인턴으로 자동 연결됩니다)
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                입력란을 벗어나거나(Blur) [일정 저장] 클릭 시 Neon DB에 즉시 반영됩니다.
+              </div>
             </div>
           </div>
 
