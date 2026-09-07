@@ -41,6 +41,21 @@ export async function saveSetting(key: string, value: any): Promise<void> {
     const errorBody = await res.text();
     throw new Error(`Failed to save setting "${key}": ${res.statusText} (${errorBody})`);
   }
+
+  // 동일 브라우저 내 다른 탭으로 즉시 알림 (추가 DB 쿼리 방지)
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('hcs_neon_sync_channel');
+      bc.postMessage({
+        type: 'SETTINGS_UPDATED',
+        settings: { [key]: value },
+        updated_at: new Date().toISOString()
+      });
+      bc.close();
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 const debounceTimers: Record<string, any> = {};
@@ -71,9 +86,11 @@ export async function deleteSetting(key: string): Promise<void> {
 export type SettingsSyncCallback = (settings: Record<string, any>) => void;
 
 /**
- * Vercel Serverless 호스팅 환경에 최적화된 실시간 동기화 구독기:
- * - 5초 주기로 가벼운 변경 감지 폴링
- * - 브라우저 탭 활성화 시 즉시 최신 데이터 반영
+ * Neon DB 무료 플랜 (100 Compute Hours) 절약형 스마트 동기화 구독기:
+ * - 탭이 숨겨져 있거나(백그라운드) 화면이 꺼져 있으면 절대 DB 요청을 보내지 않음 (Neon의 5분 자동 절전 지원)
+ * - 사용자가 브라우저 창을 보거나(Focus/VisibilityChange) 화면을 터치할 때 즉시 최신 데이터 확인 (최소 15초 쿨타임 적용)
+ * - 화면을 켜둔 채로 유지할 경우 5분(300초) 주기로만 가볍게 확인하여 무료 시간 낭비 방지
+ * - 같은 브라우저 내 탭 간에는 BroadcastChannel로 DB 요청 없이 0ms 즉시 동기화
  *
  * @returns 구독 해제 함수
  */
@@ -81,9 +98,39 @@ export function subscribeToSettings(onSync: SettingsSyncCallback): () => void {
   let timer: any = null;
   let isRunning = true;
   let lastUpdatedAt: string | null = null;
+  let lastCheckedTime = 0;
 
-  async function checkUpdates() {
+  // 브라우저 탭 간 실시간 통신 (DB 요청 0건으로 즉시 동기화)
+  let broadcastChannel: BroadcastChannel | null = null;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      broadcastChannel = new BroadcastChannel('hcs_neon_sync_channel');
+      broadcastChannel.onmessage = (event) => {
+        if (event.data?.type === 'SETTINGS_UPDATED' && event.data?.settings) {
+          lastUpdatedAt = event.data.updated_at || null;
+          onSync(event.data.settings);
+        }
+      };
+    }
+  } catch (e) {
+    // BroadcastChannel 미지원 환경 fallback
+  }
+
+  async function checkUpdates(force = false) {
     if (!isRunning) return;
+
+    // 1. 화면이 보이지 않는 백그라운드 탭이면 쿼리 실행 안 함 (Neon 절전 모드 진입 허용)
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return;
+    }
+
+    // 2. 쿨타임 (15초 이내 중복 확인 방지)
+    const now = Date.now();
+    if (!force && now - lastCheckedTime < 15000) {
+      return;
+    }
+    lastCheckedTime = now;
+
     try {
       const res = await fetchAllSettings();
       if (res.updated_at !== lastUpdatedAt) {
@@ -91,18 +138,17 @@ export function subscribeToSettings(onSync: SettingsSyncCallback): () => void {
         onSync(res.settings);
       }
     } catch (err) {
-      // 네트워크 장애 시 조용히 넘어가고 다음 주기에 재시도
       console.warn('설정 동기화 확인 실패 (재시도 대기):', err);
     }
   }
 
-  // 주기적 폴링 (5초)
-  timer = setInterval(checkUpdates, 5000);
+  // Neon 절전을 고려한 5분(300,000ms) 주기 완화 폴링
+  timer = setInterval(() => checkUpdates(false), 300000);
 
-  // 사용자가 탭으로 돌아왔을 때 즉시 확인
+  // 사용자가 탭으로 돌아오거나(화면 켬), 창을 클릭했을 때 스마트 확인
   const handleVisibilityOrFocus = () => {
     if (document.visibilityState === 'visible') {
-      checkUpdates();
+      checkUpdates(false);
     }
   };
 
@@ -114,5 +160,8 @@ export function subscribeToSettings(onSync: SettingsSyncCallback): () => void {
     if (timer) clearInterval(timer);
     window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     window.removeEventListener('focus', handleVisibilityOrFocus);
+    if (broadcastChannel) {
+      broadcastChannel.close();
+    }
   };
 }

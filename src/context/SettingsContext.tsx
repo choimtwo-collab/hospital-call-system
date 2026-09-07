@@ -1,6 +1,6 @@
 // src/context/SettingsContext.tsx — Neon PostgreSQL 실시간 동기화 Context
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { fetchAllSettings, saveSetting, subscribeToSettings } from '../api/settingsApi';
+import { fetchAllSettings, saveSetting } from '../api/settingsApi';
 import {
   InternWardGroupSetting, EmergencyContact
 } from '../types';
@@ -91,26 +91,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // ─── 실시간 주기적 동기화 ───
+  // ─── 초기 데이터 로드 (실시간 동기화는 App.tsx 단일 채널에서 통합 관리) ───
   useEffect(() => {
     loadInitial();
-
-    const unsubscribe = subscribeToSettings((newSettings) => {
-      setSettings(prev => {
-        const next = { ...prev, lastSyncedAt: new Date().toLocaleTimeString(), isConnected: true };
-        if (newSettings[SETTING_KEYS.INTERN_WARD_GROUPS]) {
-          next.internWardGroups = newSettings[SETTING_KEYS.INTERN_WARD_GROUPS];
-          localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(next.internWardGroups));
-        }
-        if (newSettings[SETTING_KEYS.HOTLINES]) {
-          next.hotlines = newSettings[SETTING_KEYS.HOTLINES];
-          localStorage.setItem('hcs_hotlines_v1', JSON.stringify(next.hotlines));
-        }
-        return next;
-      });
-    });
-
-    return unsubscribe;
   }, [loadInitial]);
 
   // ─── Setter 함수들 (DB 저장 + 즉시 상태 갱신 + localStorage 캐시) ───

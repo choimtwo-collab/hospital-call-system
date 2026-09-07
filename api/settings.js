@@ -26,14 +26,17 @@ export default async function handler(req, res) {
   const sql = neon(databaseUrl);
 
   try {
-    // ─── 테이블 존재 보장 ───
-    await sql`
-      CREATE TABLE IF NOT EXISTS admin_settings (
-        key TEXT PRIMARY KEY,
-        value JSONB NOT NULL DEFAULT '[]'::jsonb,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `;
+    // ─── 테이블 존재 보장 (최초 1회 캐싱) ───
+    if (!globalThis.__admin_settings_table_ready) {
+      await sql`
+        CREATE TABLE IF NOT EXISTS admin_settings (
+          key TEXT PRIMARY KEY,
+          value JSONB NOT NULL DEFAULT '[]'::jsonb,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      globalThis.__admin_settings_table_ready = true;
+    }
 
     // ─── GET: 모든 설정 또는 특정 키 조회 ───
     if (req.method === 'GET') {

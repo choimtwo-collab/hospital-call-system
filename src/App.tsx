@@ -315,6 +315,39 @@ export default function App() {
     return () => clearInterval(timer);
   }, [sheetsConfig.enabled, sheetsConfig.sheetUrl, sheetsConfig.autoSyncMinutes, handleSyncSheets]);
 
+  // 수동 Neon 클라우드 최신 동기화 (헤더 뱃지 클릭 시)
+  const handleManualCloudSync = useCallback(async () => {
+    try {
+      const { settings } = await fetchAllSettings();
+      if (settings) {
+        if (settings[DB_KEYS.SCHEDULES]) setSchedules(settings[DB_KEYS.SCHEDULES]);
+        if (settings[DB_KEYS.CONTACTS]) setContacts(settings[DB_KEYS.CONTACTS]);
+        if (settings[DB_KEYS.TIME_SLOTS]) setTimeSlots(settings[DB_KEYS.TIME_SLOTS]);
+        if (settings[DB_KEYS.CN_POSTS]) setCnPosts(settings[DB_KEYS.CN_POSTS]);
+        if (settings[DB_KEYS.WEEKLY_CN]) setWeeklyCNSchedule(settings[DB_KEYS.WEEKLY_CN]);
+        if (settings[DB_KEYS.TASKS]) setTasks(settings[DB_KEYS.TASKS]);
+        if (settings[DB_KEYS.CUSTOM_RULES]) setCustomRules(settings[DB_KEYS.CUSTOM_RULES]);
+        if (settings[DB_KEYS.INTERNS]) setInterns(settings[DB_KEYS.INTERNS]);
+        if (settings[DB_KEYS.PATHOLOGISTS]) setPathologistSchedules(settings[DB_KEYS.PATHOLOGISTS]);
+        if (settings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(settings[DB_KEYS.SHEETS_CONFIG]);
+        if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
+        if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
+        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
+        if (settings[DB_KEYS.HOTLINES]) updateHotlines(settings[DB_KEYS.HOTLINES]);
+        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
+        if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);
+      }
+      setIsCloudConnected(true);
+      setLastCloudSyncAt(new Date().toLocaleTimeString());
+      setSyncToastMessage('Neon 클라우드 최신 데이터가 새로고침되었습니다.');
+      setTimeout(() => setSyncToastMessage(null), 3000);
+    } catch (err) {
+      console.warn('수동 동기화 실패:', err);
+      setSyncToastMessage('동기화 실패: 네트워크 상태를 확인해주세요.');
+      setTimeout(() => setSyncToastMessage(null), 3000);
+    }
+  }, [updateHotlines, updateInternWardGroups]);
+
   const handleResetData = () => {
     Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
 
@@ -385,6 +418,7 @@ export default function App() {
         onResetData={handleResetData}
         isCloudConnected={isCloudConnected}
         lastCloudSyncAt={lastCloudSyncAt}
+        onManualSync={handleManualCloudSync}
         currentUser={currentUser}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}

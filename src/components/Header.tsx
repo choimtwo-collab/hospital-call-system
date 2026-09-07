@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Shield, User, Clock, Database, LogIn, LogOut, ShieldCheck, Lock } from 'lucide-react';
+import { Activity, Shield, User, Clock, Database, LogIn, LogOut, ShieldCheck, Lock, RefreshCw } from 'lucide-react';
 import { AppUser } from '../types';
 
 interface HeaderProps {
@@ -8,6 +8,7 @@ interface HeaderProps {
   onResetData?: () => void;
   isCloudConnected?: boolean;
   lastCloudSyncAt?: string | null;
+  onManualSync?: () => void;
   currentUser?: AppUser | null;
   onOpenAuthModal?: () => void;
   onLogout?: () => void;
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   setView, 
   isCloudConnected = false,
   lastCloudSyncAt = null,
+  onManualSync,
   currentUser = null,
   onOpenAuthModal,
   onLogout
@@ -65,21 +67,28 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Info & View Switcher */}
         <div className="flex items-center gap-2 sm:gap-4">
           
-          {/* Cloud DB Status Badge */}
-          <div 
-            title={isCloudConnected ? `Neon PostgreSQL 실시간 동기화 (최근: ${lastCloudSyncAt || '방금'})` : '클라우드 DB 연결 대기 중 (로컬 캐시 모드)'}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+          {/* Cloud DB Status Badge (클릭 시 절전형 즉시 동기화) */}
+          <button 
+            type="button"
+            onClick={onManualSync}
+            title={
               isCloudConnected 
-                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
-                : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+                ? `Neon 클라우드 연결됨 (최근: ${lastCloudSyncAt || '방금'})\n클릭하면 지금 즉시 최신 데이터를 새로고침합니다.` 
+                : '클라우드 DB 연결 대기 중 (클릭하여 재연결 시도)'
+            }
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:scale-105 active:scale-95 ${
+              isCloudConnected 
+                ? 'bg-emerald-950/40 hover:bg-emerald-900/50 border-emerald-500/40 text-emerald-300' 
+                : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-400'
             }`}
           >
             <Database className={`w-3.5 h-3.5 ${isCloudConnected ? 'text-emerald-400' : 'text-slate-400'}`} />
             <span className="hidden sm:inline">
-              {isCloudConnected ? 'Neon 실시간 동기화' : '로컬 캐시 모드'}
+              {isCloudConnected ? 'Neon 동기화' : '로컬 캐시'}
             </span>
-            <span className={`w-2 h-2 rounded-full ${isCloudConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-          </div>
+            <RefreshCw className="w-3 h-3 text-emerald-400/80 opacity-70 hover:opacity-100 transition" />
+            <span className={`w-2 h-2 rounded-full ${isCloudConnected ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+          </button>
 
           {/* Live Clock Badge */}
           <div className="hidden lg:flex items-center gap-2 bg-slate-800/80 px-3.5 py-1.5 rounded-xl border border-slate-700/60 text-slate-300 text-xs font-semibold">
