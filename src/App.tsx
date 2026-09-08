@@ -283,9 +283,15 @@ export default function App() {
   useEffect(() => { syncState(STORAGE_KEYS.APP_USERS, DB_KEYS.APP_USERS, users); }, [users, syncState]);
 
   // ─── 3. Google Sheets Sync Action ───
+  const sheetsConfigRef = useRef(sheetsConfig);
+  useEffect(() => {
+    sheetsConfigRef.current = sheetsConfig;
+  }, [sheetsConfig]);
+
   const handleSyncSheets = useCallback(async (customUrl?: string, customName?: string) => {
-    const targetUrl = customUrl || sheetsConfig.sheetUrl;
-    const targetName = customName || sheetsConfig.sheetName || '당직표';
+    const currentConfig = sheetsConfigRef.current;
+    const targetUrl = customUrl || currentConfig.sheetUrl;
+    const targetName = customName || currentConfig.sheetName || '당직표';
     if (!targetUrl) return;
 
     setIsSyncingSheets(true);
@@ -308,9 +314,9 @@ export default function App() {
       setSyncToastMessage(result.message);
       setTimeout(() => setSyncToastMessage(null), 5000);
     }
-  }, [sheetsConfig]);
+  }, []);
 
-  // Periodic Auto-Sync Effect for Google Sheets
+  // Periodic Auto-Sync Effect for Google Sheets (enabled, URL, 분 주기가 실제로 바뀔 때만 재등록)
   useEffect(() => {
     if (!sheetsConfig.enabled || !sheetsConfig.sheetUrl) return;
     handleSyncSheets();
