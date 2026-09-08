@@ -64,7 +64,13 @@ const DB_KEYS = {
 
 export default function App() {
   const [view, setView] = useState<'user' | 'admin'>('user');
-  const { settings: neonSettings, updateInternWardGroups, updateHotlines } = useSettings();
+  const {
+    settings: neonSettings,
+    updateInternWardGroups,
+    updateHotlines,
+    applyRemoteInternWardGroups,
+    applyRemoteHotlines,
+  } = useSettings();
 
   const isInitialLoaded = useRef(false);
   const isUpdatingFromRemote = useRef(false);
@@ -201,8 +207,8 @@ export default function App() {
         if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
         if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
         if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
-        if (settings[DB_KEYS.HOTLINES]) updateHotlines(settings[DB_KEYS.HOTLINES]);
-        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
+        if (settings[DB_KEYS.HOTLINES]) applyRemoteHotlines(settings[DB_KEYS.HOTLINES]);
+        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
         if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);
 
         setIsCloudConnected(true);
@@ -220,7 +226,7 @@ export default function App() {
 
     loadFromNeon();
 
-    // 5초 주기 폴링 + 포커스 복귀 시 실시간 동기화
+    // 폴링 + 포커스 복귀 시 실시간 동기화
     const unsubscribe = subscribeToSettings((remoteSettings) => {
       if (!isInitialLoaded.current) return;
       isUpdatingFromRemote.current = true;
@@ -238,8 +244,8 @@ export default function App() {
       if (remoteSettings[DB_KEYS.DUTY_ROLES]) setDutyRoles(remoteSettings[DB_KEYS.DUTY_ROLES]);
       if (remoteSettings[DB_KEYS.DUTY_PHONES]) setDutyPhones(remoteSettings[DB_KEYS.DUTY_PHONES]);
       if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]);
-      if (remoteSettings[DB_KEYS.HOTLINES]) updateHotlines(remoteSettings[DB_KEYS.HOTLINES]);
-      if (remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]);
+      if (remoteSettings[DB_KEYS.HOTLINES]) applyRemoteHotlines(remoteSettings[DB_KEYS.HOTLINES]);
+      if (remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]);
       if (remoteSettings[DB_KEYS.APP_USERS]) setUsers(remoteSettings[DB_KEYS.APP_USERS]);
 
       setIsCloudConnected(true);
@@ -251,7 +257,7 @@ export default function App() {
       isMounted = false;
       unsubscribe();
     };
-  }, [updateHotlines, updateInternWardGroups]);
+  }, [applyRemoteHotlines, applyRemoteInternWardGroups]);
 
   // ─── 2. 로컬스토리지 저장 + Neon DB 자동 동기화 헬퍼 ───
   const syncState = useCallback((storageKey: string, dbKey: string, value: any) => {
@@ -333,8 +339,8 @@ export default function App() {
         if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
         if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
         if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
-        if (settings[DB_KEYS.HOTLINES]) updateHotlines(settings[DB_KEYS.HOTLINES]);
-        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) updateInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
+        if (settings[DB_KEYS.HOTLINES]) applyRemoteHotlines(settings[DB_KEYS.HOTLINES]);
+        if (settings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
         if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);
       }
       setIsCloudConnected(true);
@@ -346,7 +352,7 @@ export default function App() {
       setSyncToastMessage('동기화 실패: 네트워크 상태를 확인해주세요.');
       setTimeout(() => setSyncToastMessage(null), 3000);
     }
-  }, [updateHotlines, updateInternWardGroups]);
+  }, [applyRemoteHotlines, applyRemoteInternWardGroups]);
 
   const handleResetData = () => {
     Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));

@@ -1,6 +1,6 @@
 // src/context/SettingsContext.tsx — Neon PostgreSQL 실시간 동기화 Context
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { fetchAllSettings, saveSetting } from '../api/settingsApi';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { saveSetting } from '../api/settingsApi';
 import {
   InternWardGroupSetting, EmergencyContact
 } from '../types';
@@ -28,6 +28,8 @@ interface SettingsContextType {
   settings: SettingsState;
   updateInternWardGroups: (groups: InternWardGroupSetting[]) => Promise<void>;
   updateHotlines: (contacts: EmergencyContact[]) => Promise<void>;
+  applyRemoteInternWardGroups: (groups: InternWardGroupSetting[]) => void;
+  applyRemoteHotlines: (contacts: EmergencyContact[]) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -50,58 +52,46 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return {
       internWardGroups: initialGroups,
       hotlines: initialHotlines,
-      isLoading: true,
+      isLoading: false,
       isConnected: false,
       lastSyncedAt: null,
       error: null,
     };
   });
 
-  // ─── 초기 데이터 로드 ───
-  const loadInitial = useCallback(async () => {
+  // ─── 원격 동기화 수신 전용 함수 (절대 DB에 재저장(saveSetting)하지 않음 - 무한 루프 원천 차단) ───
+  const applyRemoteInternWardGroups = useCallback((groups: InternWardGroupSetting[]) => {
+    setSettings(prev => ({
+      ...prev,
+      internWardGroups: groups,
+      isConnected: true,
+      lastSyncedAt: new Date().toLocaleTimeString(),
+    }));
     try {
-      const res = await fetchAllSettings();
-      const loadedSettings = res.settings || {};
-
-      setSettings(prev => ({
-        ...prev,
-        internWardGroups: loadedSettings[SETTING_KEYS.INTERN_WARD_GROUPS] || prev.internWardGroups,
-        hotlines: loadedSettings[SETTING_KEYS.HOTLINES] || prev.hotlines,
-        isLoading: false,
-        isConnected: true,
-        lastSyncedAt: new Date().toLocaleTimeString(),
-        error: null,
-      }));
-
-      // localStorage에도 캐싱
-      if (loadedSettings[SETTING_KEYS.INTERN_WARD_GROUPS]) {
-        localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(loadedSettings[SETTING_KEYS.INTERN_WARD_GROUPS]));
-      }
-      if (loadedSettings[SETTING_KEYS.HOTLINES]) {
-        localStorage.setItem('hcs_hotlines_v1', JSON.stringify(loadedSettings[SETTING_KEYS.HOTLINES]));
-      }
-    } catch (err: any) {
-      console.warn('Neon API 연결 실패, 로컬 캐시 데이터 사용:', err.message);
-      setSettings(prev => ({
-        ...prev,
-        isLoading: false,
-        isConnected: false,
-        error: '클라우드 DB에 연결할 수 없어 로컬 캐시 데이터를 사용 중입니다.',
-      }));
-    }
+      localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(groups));
+    } catch (e) {}
   }, []);
 
-  // ─── 초기 데이터 로드 (실시간 동기화는 App.tsx 단일 채널에서 통합 관리) ───
-  useEffect(() => {
-    loadInitial();
-  }, [loadInitial]);
+  const applyRemoteHotlines = useCallback((contacts: EmergencyContact[]) => {
+    setSettings(prev => ({
+      ...prev,
+      hotlines: contacts,
+      isConnected: true,
+      lastSyncedAt: new Date().toLocaleTimeString(),
+    }));
+    try {
+      localStorage.setItem('hcs_hotlines_v1', JSON.stringify(contacts));
+    } catch (e) {}
+  }, []);
 
-  // ─── Setter 함수들 (DB 저장 + 즉시 상태 갱신 + localStorage 캐시) ───
+  // ─── 사용자 직접 수정 Setter 함수들 (사용자가 관리자 UI에서 직접 수정했을 때만 DB 저장) ───
 
   const updateInternWardGroups = useCallback(async (groups: InternWardGroupSetting[]) => {
     // 1. UI 즉시 반응 (낙관적 갱신)
     setSettings(prev => ({ ...prev, internWardGroups: groups }));
-    localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(groups));
+    try {
+      localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(groups));
+    } catch (e) {}
 
     // 2. Neon DB에 저장
     try {
@@ -114,7 +104,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateHotlines = useCallback(async (contacts: EmergencyContact[]) => {
     // 1. UI 즉시 반응 (낙관적 갱신)
     setSettings(prev => ({ ...prev, hotlines: contacts }));
-    localStorage.setItem('hcs_hotlines_v1', JSON.stringify(contacts));
+    try {
+      localStorage.setItem('hcs_hotlines_v1', JSON.stringify(contacts));
+    } catch (e) {}
 
     // 2. Neon DB에 저장
     try {
@@ -125,7 +117,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   return (
-    <SettingsContext.Provider value={{ settings, updateInternWardGroups, updateHotlines }}>
+    <SettingsContext.Provider value={{
+      settings,
+      updateInternWardGroups,
+      updateHotlines,
+      applyRemoteInternWardGroups,
+      applyRemoteHotlines,
+    }}>
       {children}
     </SettingsContext.Provider>
   );
@@ -139,3 +137,4 @@ export const useSettings = (): SettingsContextType => {
   }
   return ctx;
 };
+
