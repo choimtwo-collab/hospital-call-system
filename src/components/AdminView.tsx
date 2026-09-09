@@ -2142,45 +2142,69 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
           {/* Standard Format Guide Card */}
           <div className="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-xl space-y-3">
-            <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              구글 시트 권장 열(Column) 구성
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                구글 시트 권장 열(Column) 구성
+              </h4>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 w-fit">
+                ✓ 9개 분리 표준 규격 & 기존 5개 열 형식 100% 하위 호환 지원
+              </span>
+            </div>
             <p className="text-xs text-slate-400">
-              구글 시트 1행(헤더)에 아래 순서로 작성하시면 시스템이 자동으로 정확하게 인식합니다:
+              구글 시트 1행(헤더)에 아래 순서로 작성하시면 시스템이 주간 근무자와 야간/주말 당직자를 자동으로 정확하게 인식합니다:
             </p>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left min-w-[800px]">
                 <thead className="bg-slate-800 text-slate-300 font-bold">
                   <tr>
                     <th className="p-2.5">A열: 날짜</th>
-                    <th className="p-2.5">B열: 내과1</th>
-                    <th className="p-2.5">C열: 내과2</th>
-                    <th className="p-2.5">D열: 비내과1</th>
-                    <th className="p-2.5">E열: 비내과2</th>
-                    <th className="p-2.5">F열: 비내과3</th>
+                    <th className="p-2.5 text-cyan-300">B열: 내과 1 (주간)</th>
+                    <th className="p-2.5 text-cyan-300">C열: 내과 2 (주간)</th>
+                    <th className="p-2.5 text-rose-300">D열: 심장내과</th>
+                    <th className="p-2.5 text-teal-300">E열: 호흡기내과</th>
+                    <th className="p-2.5 text-indigo-300">F열: 내과당직 1</th>
+                    <th className="p-2.5 text-indigo-300">G열: 내과당직 2</th>
+                    <th className="p-2.5">H열: 비내과 1</th>
+                    <th className="p-2.5">I열: 비내과 2</th>
+                    <th className="p-2.5">J열: 비내과 3</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
                   <tr className="hover:bg-slate-800/40">
                     <td className="p-2.5 text-cyan-300 font-bold">2026-09-01</td>
-                    <td className="p-2.5">이준재</td>
-                    <td className="p-2.5">정소영</td>
+                    <td className="p-2.5 font-semibold text-cyan-200">이준재</td>
+                    <td className="p-2.5 font-semibold text-cyan-200">정소영</td>
+                    <td className="p-2.5 font-semibold text-rose-200">신정민</td>
+                    <td className="p-2.5 font-semibold text-teal-200">박수현</td>
+                    <td className="p-2.5 font-semibold text-indigo-200">이준재</td>
+                    <td className="p-2.5 font-semibold text-indigo-200">정소영</td>
                     <td className="p-2.5">신정민</td>
                     <td className="p-2.5">이창윤</td>
                     <td className="p-2.5">배규리</td>
                   </tr>
                   <tr className="hover:bg-slate-800/40">
                     <td className="p-2.5 text-cyan-300 font-bold">2026-09-02</td>
-                    <td className="p-2.5">정소영</td>
-                    <td className="p-2.5">박신희</td>
+                    <td className="p-2.5 font-semibold text-cyan-200">정소영</td>
+                    <td className="p-2.5 font-semibold text-cyan-200">박신희</td>
+                    <td className="p-2.5 font-semibold text-rose-200">신정민</td>
+                    <td className="p-2.5 font-semibold text-teal-200">박수현</td>
+                    <td className="p-2.5 font-semibold text-indigo-200">정소영</td>
+                    <td className="p-2.5 font-semibold text-indigo-200">박신희</td>
                     <td className="p-2.5">배규리</td>
                     <td className="p-2.5">최남석</td>
                     <td className="p-2.5">이태겸</td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-400">
+              <span className="text-amber-400 font-bold">💡 호환성 팁:</span>
+              <span>
+                열 순서가 바뀌거나 영문/별칭(예: <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">cv분과</code>, <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">imr</code>, <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">내과당직1</code>)으로 기재되어 있어도 시스템이 스마트하게 자동 매핑합니다.
+              </span>
             </div>
           </div>
 

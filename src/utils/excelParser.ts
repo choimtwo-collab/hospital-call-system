@@ -243,13 +243,15 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
 
           let formattedDate = '';
           if (typeof rawDate === 'number') {
-            // Excel Serial Date Number
-            const dateObj = XLSX.SSF.parse_date_code(rawDate);
-            if (dateObj) {
-              const y = dateObj.y;
-              const m = String(dateObj.m).padStart(2, '0');
-              const d = String(dateObj.d).padStart(2, '0');
+            // Excel Serial Date Number 안전 변환
+            try {
+              const jsDate = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+              const y = jsDate.getUTCFullYear();
+              const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(jsDate.getUTCDate()).padStart(2, '0');
               formattedDate = `${y}-${m}-${d}`;
+            } catch {
+              formattedDate = '';
             }
           } else {
             const str = String(rawDate).trim();

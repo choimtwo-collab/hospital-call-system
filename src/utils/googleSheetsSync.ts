@@ -128,90 +128,161 @@ export async function fetchGoogleSheetSchedules(
       };
     }
 
-    // 헤더 행 분석
-    const headerRow = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/\s+/g, ''));
+    // 상위 10행 내에서 유효한 헤더 행 동적 탐색
+    let headerRowIndex = -1;
     let dateCol = -1;
-    let im1Col = -1;
-    let im2Col = -1;
-    let non1Col = -1;
-    let non2Col = -1;
-    let non3Col = -1;
 
-    headerRow.forEach((h, idx) => {
-      if (h.includes('날짜') || h.includes('date') || h.includes('일자')) {
-        dateCol = idx;
-      } else if (h.includes('비내과') || h.includes('non')) {
-        // 비내과를 반드시 내과보다 먼저 검사!
-        if (h.includes('1') || h.includes('당직인턴1')) non1Col = idx;
-        else if (h.includes('2') || h.includes('당직인턴2')) non2Col = idx;
-        else if (h.includes('3') || h.includes('당직인턴3')) non3Col = idx;
-      } else if (h.includes('내과') || h.includes('im')) {
-        if (h.includes('1') || h.includes('인턴1')) im1Col = idx;
-        else if (h.includes('2') || h.includes('인턴2')) im2Col = idx;
-      } else if (h.includes('당직인턴1') || h === '당직1') {
-        non1Col = idx;
+    for (let r = 0; r < Math.min(rows.length, 10); r++) {
+      const row = rows[r];
+      if (!row || !Array.isArray(row)) continue;
+
+      for (let c = 0; c < row.length; c++) {
+        const cell = String(row[c] || '').trim().toLowerCase().replace(/\s+/g, '');
+        if (cell.includes('날짜') || cell.includes('date') || cell.includes('일자') || cell === '일' || cell === '일시') {
+          headerRowIndex = r;
+          dateCol = c;
+          break;
+        }
+      }
+      if (headerRowIndex !== -1) break;
+    }
+
+    if (headerRowIndex === -1) {
+      headerRowIndex = 0;
+      dateCol = 0;
+    }
+
+    const headerRow = rows[headerRowIndex] || [];
+    interface ColumnMapping {
+      colIndex: number;
+      targetKeys: string[];
+    }
+    const columnMappings: ColumnMapping[] = [];
+
+    headerRow.forEach((rawH, idx) => {
+      if (idx === dateCol) return;
+      const hStr = String(rawH || '').trim();
+      if (!hStr) return;
+      const h = hStr.toLowerCase().replace(/\s+/g, '');
+
+      const targetKeys: string[] = [];
+
+      // 1. 비내과 (Non-Internal Medicine) - 반드시 내과보다 먼저 판별!
+      if (h.includes('비내과') || h.includes('non')) {
+        if (h.includes('1') || h.includes('당직인턴1') || h.includes('인턴1')) {
+          targetKeys.push(ROLES.NON_IM_1, '비내과 1', '비내과1', '비내과1 (당직인턴1)');
+        } else if (h.includes('2') || h.includes('당직인턴2') || h.includes('인턴2')) {
+          targetKeys.push(ROLES.NON_IM_2, '비내과 2', '비내과2', '비내과2 (당직인턴2)');
+        } else if (h.includes('3') || h.includes('당직인턴3') || h.includes('인턴3')) {
+          targetKeys.push(ROLES.NON_IM_3, '비내과 3', '비내과3', '비내과3 (당직인턴3)');
+        }
+      }
+      // 2. 심장내과 (Cardiology / CV 분과)
+      else if (h.includes('심장') || h.includes('cv') || h.includes('순환기')) {
+        targetKeys.push('심장내과', 'cv 분과', 'cv분과', 'cv', '순환기내과');
+      }
+      // 3. 호흡기내과 (Pulmonology / IMR 분과)
+      else if (h.includes('호흡기') || h.includes('imr') || h.includes('pulmo')) {
+        targetKeys.push('호흡기내과', 'imr 분과', 'imr분과', 'imr');
+      }
+      // 4. 내과 (Internal Medicine) - 주간 / 당직 구분 지원
+      else if (h.includes('내과') || h.includes('im')) {
+        const isDuty = h.includes('당직') || h.includes('night') || h.includes('duty');
+        const isDay = h.includes('주간') || h.includes('day');
+
+        if (h.includes('1') || h.includes('인턴1')) {
+          if (isDuty) {
+            targetKeys.push('내과당직 1', '내과당직1', ROLES.IM_DUTY_1, '내과인턴당직1', '내과인턴당직 1');
+          } else if (isDay) {
+            targetKeys.push('내과 1 (주간)', '내과 1(주간)', '내과1(주간)', ROLES.IM_1, '내과1 (인턴1)', '내과 1', '내과1');
+          } else {
+            // 주간/당직 미명시된 일반 '내과 1'인 경우 하위 호환을 위해 주간 및 당직 둘 다 매핑
+            targetKeys.push(
+              '내과 1 (주간)', '내과 1(주간)', '내과1(주간)', ROLES.IM_1, '내과1 (인턴1)', '내과 1', '내과1',
+              '내과당직 1', '내과당직1', ROLES.IM_DUTY_1, '내과인턴당직1'
+            );
+          }
+        } else if (h.includes('2') || h.includes('인턴2')) {
+          if (isDuty) {
+            targetKeys.push('내과당직 2', '내과당직2', ROLES.IM_DUTY_2, '내과인턴당직2', '내과인턴당직 2');
+          } else if (isDay) {
+            targetKeys.push('내과 2 (주간)', '내과 2(주간)', '내과2(주간)', ROLES.IM_2, '내과2 (인턴2)', '내과 2', '내과2');
+          } else {
+            // 주간/당직 미명시된 일반 '내과 2'인 경우 하위 호환을 위해 주간 및 당직 둘 다 매핑
+            targetKeys.push(
+              '내과 2 (주간)', '내과 2(주간)', '내과2(주간)', ROLES.IM_2, '내과2 (인턴2)', '내과 2', '내과2',
+              '내과당직 2', '내과당직2', ROLES.IM_DUTY_2, '내과인턴당직2'
+            );
+          }
+        }
+      }
+      // 5. 기타 당직 키워드 단독 열
+      else if (h.includes('당직인턴1') || h === '당직1') {
+        targetKeys.push(ROLES.NON_IM_1, '비내과 1', '비내과1', '비내과1 (당직인턴1)');
       } else if (h.includes('당직인턴2') || h === '당직2') {
-        non2Col = idx;
+        targetKeys.push(ROLES.NON_IM_2, '비내과 2', '비내과2', '비내과2 (당직인턴2)');
       } else if (h.includes('당직인턴3') || h === '당직3') {
-        non3Col = idx;
+        targetKeys.push(ROLES.NON_IM_3, '비내과 3', '비내과3', '비내과3 (당직인턴3)');
       } else if (h === '인턴1') {
-        im1Col = idx;
+        targetKeys.push('내과 1 (주간)', '내과당직 1', ROLES.IM_1, '내과 1', '내과1', ROLES.IM_DUTY_1, '내과인턴당직1');
       } else if (h === '인턴2') {
-        im2Col = idx;
+        targetKeys.push('내과 2 (주간)', '내과당직 2', ROLES.IM_2, '내과 2', '내과2', ROLES.IM_DUTY_2, '내과인턴당직2');
+      }
+
+      if (targetKeys.length > 0) {
+        columnMappings.push({ colIndex: idx, targetKeys });
       }
     });
-
-    if (dateCol === -1) dateCol = 0;
-    if (im1Col === -1) im1Col = 1;
-    if (im2Col === -1) im2Col = 2;
-    if (non1Col === -1) non1Col = 3;
-    if (non2Col === -1) non2Col = 4;
-    if (non3Col === -1) non3Col = 5;
 
     const newSchedules: DateScheduleMap = {};
     const parsedDates: string[] = [];
 
-    for (let r = 1; r < rows.length; r++) {
+    for (let r = headerRowIndex + 1; r < rows.length; r++) {
       const row = rows[r];
       if (!row || row.length === 0) continue;
 
       let rawDate = row[dateCol];
-      if (!rawDate) continue;
+      if (rawDate === undefined || rawDate === null || String(rawDate).trim() === '') continue;
 
-      let formattedDate = String(rawDate).trim().replace(/\./g, '-').replace(/\//g, '-');
-      const parts = formattedDate.split('-');
-      if (parts.length === 3) {
-        const y = parts[0].length === 2 ? `20${parts[0]}` : parts[0];
-        const m = parts[1].padStart(2, '0');
-        const d = parts[2].padStart(2, '0');
-        formattedDate = `${y}-${m}-${d}`;
+      let formattedDate = '';
+      const numDate = Number(rawDate);
+      if (typeof rawDate === 'number' || (!isNaN(numDate) && numDate > 30000 && numDate < 60000)) {
+        // 엑셀/구글시트 시리얼 날짜 코드 안전 변환 (1970-01-01 기준 25569일 차이)
+        try {
+          const jsDate = new Date(Math.round((numDate - 25569) * 86400 * 1000));
+          const y = jsDate.getUTCFullYear();
+          const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(jsDate.getUTCDate()).padStart(2, '0');
+          formattedDate = `${y}-${m}-${d}`;
+        } catch {
+          formattedDate = '';
+        }
+      } else {
+        const cleanedStr = String(rawDate).trim().replace(/\./g, '-').replace(/\//g, '-');
+        const parts = cleanedStr.split('-');
+        if (parts.length === 3) {
+          const y = parts[0].length === 2 ? `20${parts[0]}` : parts[0];
+          const m = parts[1].padStart(2, '0');
+          const d = parts[2].padStart(2, '0');
+          formattedDate = `${y}-${m}-${d}`;
+        } else if (/^\d{8}$/.test(cleanedStr)) {
+          // YYYYMMDD
+          formattedDate = `${cleanedStr.substring(0, 4)}-${cleanedStr.substring(4, 6)}-${cleanedStr.substring(6, 8)}`;
+        }
       }
 
       if (!formattedDate || formattedDate.length < 8) continue;
 
-      const im1Val = String(row[im1Col] || '').trim();
-      const im2Val = String(row[im2Col] || '').trim();
-      const non1Val = String(row[non1Col] || '').trim();
-      const non2Val = String(row[non2Col] || '').trim();
-      const non3Val = String(row[non3Col] || '').trim();
+      const daySched: Record<string, string> = {};
 
-      newSchedules[formattedDate] = {
-        [ROLES.IM_1]: im1Val,
-        '내과 1': im1Val,
-        '내과1': im1Val,
-        [ROLES.IM_2]: im2Val,
-        '내과 2': im2Val,
-        '내과2': im2Val,
-        [ROLES.NON_IM_1]: non1Val,
-        '비내과 1': non1Val,
-        '비내과1': non1Val,
-        [ROLES.NON_IM_2]: non2Val,
-        '비내과 2': non2Val,
-        '비내과2': non2Val,
-        [ROLES.NON_IM_3]: non3Val,
-        '비내과 3': non3Val,
-        '비내과3': non3Val
-      };
+      columnMappings.forEach(mapping => {
+        const cellVal = String(row[mapping.colIndex] || '').trim();
+        mapping.targetKeys.forEach(key => {
+          daySched[key] = cellVal;
+        });
+      });
+
+      newSchedules[formattedDate] = daySched;
       parsedDates.push(formattedDate);
     }
 
