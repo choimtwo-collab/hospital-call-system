@@ -17,7 +17,7 @@ import {
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
 import { checkKoreanHoliday } from '../utils/koreanHolidays';
-import { makeUcapCall, DUMC_CALL_APK_URL } from '../utils/callHelper';
+import { getUcapCallHref, DUMC_CALL_APK_URL } from '../utils/callHelper';
 
 interface UserViewProps {
   schedules: DateScheduleMap;
@@ -77,13 +77,14 @@ export const UserView: React.FC<UserViewProps> = ({
   const [myDefaultWard, setMyDefaultWard] = useState<string | null>(savedMyWard);
   const [callStatusMessage, setCallStatusMessage] = useState<string | null>(null);
 
-  // UCAP 번호 통화 처리 (DUMC Call 우선 연결, 미설치 시 일반 전화 자동 전환)
-  const handleUcapClick = (ucapNum?: string, fallbackPhoneNum?: string) => {
+  // UCAP 번호 클릭 시 클립보드 복사 및 안내 피드백
+  const handleUcapClickFeedback = (ucapNum?: string) => {
     if (!ucapNum || ucapNum === '-') return;
-    makeUcapCall(ucapNum, fallbackPhoneNum, (msg) => {
-      setCallStatusMessage(msg);
-      setTimeout(() => setCallStatusMessage(null), 3500);
-    });
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(ucapNum).catch(() => {});
+    }
+    setCallStatusMessage(`프리존(DUMC Call) 앱으로 연결 중... (내선 ${ucapNum} 복사됨)`);
+    setTimeout(() => setCallStatusMessage(null), 3500);
   };
 
   // Filter tasks based on selected department and search query
@@ -592,13 +593,10 @@ export const UserView: React.FC<UserViewProps> = ({
                 {/* One-Click Call Buttons */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   
-                  {/* UCAP Button (DUMC Call 우선 연동, 미설치 시 일반 전화 자동 연결) */}
-                  <button
-                    type="button"
-                    onClick={() => handleUcapClick(
-                      searchResult.dutyUcap || searchResult.contactInfo.ucap,
-                      searchResult.dutyPhone || searchResult.contactInfo.phone
-                    )}
+                  {/* UCAP Button (프리존 / DUMC Call 앱 직접 연동) */}
+                  <a
+                    href={getUcapCallHref(searchResult.dutyUcap || searchResult.contactInfo.ucap)}
+                    onClick={() => handleUcapClickFeedback(searchResult.dutyUcap || searchResult.contactInfo.ucap)}
                     className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black shadow-xl shadow-cyan-500/25 transition group text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -609,7 +607,7 @@ export const UserView: React.FC<UserViewProps> = ({
                         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-extrabold text-slate-900">
                           <span>병동 내선 (UCAP 즉시 콜)</span>
                           <span className="px-1.5 py-0.5 bg-slate-950/20 rounded text-[9px] font-black tracking-tight">
-                            원클릭 전화 연결
+                            프리존(DUMC Call) 연동
                           </span>
                         </div>
                         <div className="text-lg font-black tracking-tight">
@@ -618,7 +616,7 @@ export const UserView: React.FC<UserViewProps> = ({
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition" />
-                  </button>
+                  </a>
 
                   {/* Phone Button */}
                   <a
@@ -646,8 +644,8 @@ export const UserView: React.FC<UserViewProps> = ({
                 {/* DUMC Call App Hint & Direct Install */}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 px-1 pt-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>클릭 시 스마트폰 전화로 바로 연결되며, 내선번호가 자동 복사됩니다.</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>클릭 시 프리존(DUMC Call) 앱으로 연결되며, 내선번호가 자동 복사됩니다.</span>
                   </span>
                   <a
                     href={DUMC_CALL_APK_URL}
@@ -656,7 +654,7 @@ export const UserView: React.FC<UserViewProps> = ({
                     className="text-cyan-400 hover:text-cyan-300 underline font-semibold flex items-center gap-1 shrink-0"
                   >
                     <Download className="w-3 h-3" />
-                    DUMC Call(프리존) 앱 설치 APK
+                    프리존(DUMC Call) 앱 설치 APK
                   </a>
                 </div>
 
@@ -778,31 +776,31 @@ export const UserView: React.FC<UserViewProps> = ({
                   {/* Backup Quick Dial Buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     {searchResult.backupContact1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleUcapClick(searchResult.backupContact1!.ucap)}
+                      <a
+                        href={getUcapCallHref(searchResult.backupContact1.ucap)}
+                        onClick={() => handleUcapClickFeedback(searchResult.backupContact1!.ucap)}
                         className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition text-left cursor-pointer"
                       >
                         <div>
-                          <span className="text-[10px] text-amber-400 block font-bold">1순위 백업</span>
+                          <span className="text-[10px] text-amber-400 block font-bold">1순위 백업 (프리존)</span>
                           <span className="font-bold text-white">{searchResult.backupContact1.roleName}</span>
                         </div>
                         <span className="font-extrabold text-cyan-300">UCAP {searchResult.backupContact1.ucap}</span>
-                      </button>
+                      </a>
                     )}
 
                     {searchResult.backupContact2 && (
-                      <button
-                        type="button"
-                        onClick={() => handleUcapClick(searchResult.backupContact2!.ucap)}
+                      <a
+                        href={getUcapCallHref(searchResult.backupContact2.ucap)}
+                        onClick={() => handleUcapClickFeedback(searchResult.backupContact2!.ucap)}
                         className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition text-left cursor-pointer"
                       >
                         <div>
-                          <span className="text-[10px] text-amber-400 block font-bold">2순위 백업</span>
+                          <span className="text-[10px] text-amber-400 block font-bold">2순위 백업 (프리존)</span>
                           <span className="font-bold text-white">{searchResult.backupContact2.roleName}</span>
                         </div>
                         <span className="font-extrabold text-cyan-300">UCAP {searchResult.backupContact2.ucap}</span>
-                      </button>
+                      </a>
                     )}
                   </div>
                 </div>
@@ -819,10 +817,10 @@ export const UserView: React.FC<UserViewProps> = ({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
               {emergencyContacts.map(contact => (
-                <button
+                <a
                   key={contact.id}
-                  type="button"
-                  onClick={() => handleUcapClick(contact.ucap, contact.phone !== '-' ? contact.phone : undefined)}
+                  href={getUcapCallHref(contact.ucap)}
+                  onClick={() => handleUcapClickFeedback(contact.ucap)}
                   className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 transition flex flex-col justify-between group shadow-sm hover:shadow-cyan-500/10 text-left cursor-pointer"
                 >
                   <div>
@@ -849,7 +847,7 @@ export const UserView: React.FC<UserViewProps> = ({
                       <span className="text-[10px] font-mono text-slate-400">{contact.phone}</span>
                     )}
                   </div>
-                </button>
+                </a>
               ))}
             </div>
           </div>
