@@ -152,8 +152,18 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           }
 
           // 6. 관리자가 등록한 커스텀 구분(role)과 일치 여부 확인
+          const isHNonIm = h.includes('비내과') || h.includes('non');
+          const isHIm = !isHNonIm && (h.includes('내과') || h.includes('im'));
+
           for (const role of activeDutyRoles) {
             const cleanRole = role.replace(/\s+/g, '').toLowerCase();
+            const isRoleNonIm = cleanRole.includes('비내과') || cleanRole.includes('non');
+            const isRoleIm = !isRoleNonIm && (cleanRole.includes('내과') || cleanRole.includes('im'));
+
+            // 비내과 헤더인데 내과 역할이거나, 내과 헤더인데 비내과 역할인 경우 교차 매칭 방지 ('비내과1'.includes('내과1') 방지)
+            if (isHNonIm && isRoleIm) continue;
+            if (isHIm && isRoleNonIm) continue;
+
             if (h === cleanRole || h.includes(cleanRole) || cleanRole.includes(h)) {
               if (!targetKeys.includes(role)) targetKeys.push(role);
               if (!detectedColumnNames.includes(role)) detectedColumnNames.push(role);

@@ -4,7 +4,9 @@ import { saveSetting } from '../api/settingsApi';
 import {
   InternWardGroupSetting, EmergencyContact
 } from '../types';
-import { initialInternWardGroups, emergencyContacts as defaultEmergencyContacts } from '../data/initialData';
+import { 
+  initialInternWardGroups, emergencyContacts as defaultEmergencyContacts, normalizeInternWardGroups 
+} from '../data/initialData';
 
 // ─── 설정 키 상수 ───
 export const SETTING_KEYS = {
@@ -42,7 +44,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let initialHotlines = defaultEmergencyContacts;
     try {
       const savedGroups = localStorage.getItem('hcs_intern_ward_groups_v1');
-      if (savedGroups) initialGroups = JSON.parse(savedGroups);
+      if (savedGroups) initialGroups = normalizeInternWardGroups(JSON.parse(savedGroups));
       const savedHotlines = localStorage.getItem('hcs_hotlines_v1');
       if (savedHotlines) initialHotlines = JSON.parse(savedHotlines);
     } catch (e) {
@@ -50,7 +52,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     return {
-      internWardGroups: initialGroups,
+      internWardGroups: normalizeInternWardGroups(initialGroups),
       hotlines: initialHotlines,
       isLoading: false,
       isConnected: false,
@@ -61,14 +63,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // ─── 원격 동기화 수신 전용 함수 (절대 DB에 재저장(saveSetting)하지 않음 - 무한 루프 원천 차단) ───
   const applyRemoteInternWardGroups = useCallback((groups: InternWardGroupSetting[]) => {
+    const normalized = normalizeInternWardGroups(groups);
     setSettings(prev => ({
       ...prev,
-      internWardGroups: groups,
+      internWardGroups: normalized,
       isConnected: true,
       lastSyncedAt: new Date().toLocaleTimeString(),
     }));
     try {
-      localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(groups));
+      localStorage.setItem('hcs_intern_ward_groups_v1', JSON.stringify(normalized));
     } catch (e) {}
   }, []);
 

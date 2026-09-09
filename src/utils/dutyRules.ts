@@ -1,6 +1,6 @@
 import { 
   DepartmentType, ROLES, DUTY_PHONES, DUTY_UCAPS, WARD_GROUPS, getCNPostContact, areWardsEqual,
-  initialInternWardGroups, getRelatedRoleKeys 
+  initialInternWardGroups, getRelatedRoleKeys, normalizeInternWardGroups 
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap, 
@@ -10,8 +10,8 @@ import {
 import { checkKoreanHoliday } from './koreanHolidays';
 
 /**
- * 당직표에서 역할별 의사 이름을 검색합니다. ('내과 1', '내과1 (인턴1)', '비내과 1' 등 별칭 자동 처리)
- * 관리자 화면 캘린더/그리드에서 직접 편집한 표준 키('내과 1', '비내과 1' 등)를 최우선으로 반영합니다.
+ * 당직표에서 역할별 의사 이름을 검색합니다. ('내과 1', '내과1 (인턴1)', '내과인턴당직1', '비내과 1' 등 별칭 자동 처리)
+ * 관리자 화면 캘린더/그리드에서 직접 편집한 표준 키를 최우선으로 반영합니다.
  */
 export function getScheduleDoctor(schedule: Record<string, string> | undefined, roleKey: string): string {
   if (!schedule) return '';
@@ -20,32 +20,38 @@ export function getScheduleDoctor(schedule: Record<string, string> | undefined, 
   const isNonIm = cleanKey.includes('비내과') || cleanKey.includes('non');
   const isIm = !isNonIm && (cleanKey.includes('내과') || cleanKey.includes('im'));
 
-  // 1. 관리자 화면 캘린더 뷰에서 주로 편집하는 표준 키 우선 탐색
+  // 1. Exact match 우선 탐색
+  if (schedule[roleKey] && schedule[roleKey].trim()) return schedule[roleKey].trim();
+
+  // 2. 표준 역할 키 및 별칭 키 탐색
   if (isIm) {
-    if (cleanKey.includes('1') || cleanKey.includes('인턴1')) {
-      const v = schedule['내과 1'] ?? schedule['내과1'] ?? schedule[ROLES.IM_1];
+    if (cleanKey.includes('당직1') || cleanKey.includes('당직인턴1')) {
+      const v = schedule[ROLES.IM_DUTY_1] ?? schedule['내과인턴당직1'] ?? schedule['내과인턴당직 1'] ?? schedule['내과당직 1'] ?? schedule['내과당직1'] ?? schedule[ROLES.IM_1] ?? schedule['내과1'] ?? schedule['내과 1'];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    } else if (cleanKey.includes('당직2') || cleanKey.includes('당직인턴2')) {
+      const v = schedule[ROLES.IM_DUTY_2] ?? schedule['내과인턴당직2'] ?? schedule['내과인턴당직 2'] ?? schedule['내과당직 2'] ?? schedule['내과당직2'] ?? schedule[ROLES.IM_2] ?? schedule['내과2'] ?? schedule['내과 2'];
+      if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+    } else if (cleanKey.includes('1') || cleanKey.includes('인턴1')) {
+      const v = schedule[ROLES.IM_1] ?? schedule['내과1'] ?? schedule['내과 1'] ?? schedule['내과인턴당직1'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     } else if (cleanKey.includes('2') || cleanKey.includes('인턴2')) {
-      const v = schedule['내과 2'] ?? schedule['내과2'] ?? schedule[ROLES.IM_2];
+      const v = schedule[ROLES.IM_2] ?? schedule['내과2'] ?? schedule['내과 2'] ?? schedule['내과인턴당직2'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     }
   }
 
   if (isNonIm) {
     if (cleanKey.includes('1') || cleanKey.includes('당직인턴1')) {
-      const v = schedule['비내과 1'] ?? schedule['비내과1'] ?? schedule[ROLES.NON_IM_1];
+      const v = schedule[ROLES.NON_IM_1] ?? schedule['비내과1'] ?? schedule['비내과 1'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     } else if (cleanKey.includes('2') || cleanKey.includes('당직인턴2')) {
-      const v = schedule['비내과 2'] ?? schedule['비내과2'] ?? schedule[ROLES.NON_IM_2];
+      const v = schedule[ROLES.NON_IM_2] ?? schedule['비내과2'] ?? schedule['비내과 2'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     } else if (cleanKey.includes('3') || cleanKey.includes('당직인턴3')) {
-      const v = schedule['비내과 3'] ?? schedule['비내과3'] ?? schedule[ROLES.NON_IM_3];
+      const v = schedule[ROLES.NON_IM_3] ?? schedule['비내과3'] ?? schedule['비내과 3'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     }
   }
-
-  // 2. Exact match
-  if (schedule[roleKey] && schedule[roleKey].trim()) return schedule[roleKey].trim();
 
   // 3. Fallback: 루프를 돌며 cleanKey 매칭
   for (const [k, v] of Object.entries(schedule)) {
@@ -107,10 +113,21 @@ export function evaluateDutyRules(
 
   const hour = parseInt(selectedTime.split(':')[0], 10);
   const minute = parseInt(selectedTime.split(':')[1] || '0', 10);
+  const timeMinutes = hour * 60 + minute;
   const timeDecimal = hour + minute / 60;
   
-  // 정규 시간: 평일(공휴일 제외) 08:00 ~ 17:00
-  const isRegularHours = !isWeekendOrHoliday && (timeDecimal >= 8 && timeDecimal < 17);
+  // 평일 주간: 08:01 ~ 17:00 (481분 ~ 1020분)
+  // 평일 당직: 17:01 ~ 익일 08:00 (1021분 이상 또는 480분 이하)
+  // 주말/공휴일 주간당직: 08:01 ~ 20:00 (481분 ~ 1200분)
+  // 주말/공휴일 야간당직: 20:01 ~ 익일 08:00 (1201분 이상 또는 480분 이하)
+  const isWeekdayDaytime = !isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1020);
+  const isWeekdayDuty = !isWeekendOrHoliday && (timeMinutes > 1020 || timeMinutes < 481);
+  const isWeekendDayDuty = isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1200);
+  const isWeekendNightDuty = isWeekendOrHoliday && (timeMinutes > 1200 || timeMinutes < 481);
+  const isDutyHours = isWeekendOrHoliday || isWeekdayDuty;
+
+  // 기존 정규시간 호환 (08:01 ~ 17:00)
+  const isRegularHours = isWeekdayDaytime;
   // 야간 시간: 22:00 ~ 익일 08:00
   const isNightHours = (timeDecimal >= 22 || timeDecimal < 8);
   // 이브닝 구간: 17:00 ~ 22:00
@@ -138,26 +155,45 @@ export function evaluateDutyRules(
       (cleanNameBase && cleanSelectedTask.includes(cleanNameBase));
   });
 
-  // 인턴 역할별 담당 병동 그룹 해석 (관리자 설정 우선)
-  const activeInternGroups = (internWardGroups && internWardGroups.length > 0) ? internWardGroups : initialInternWardGroups;
-  const im1Wards = activeInternGroups.find(g => g.id === 'im_1')?.wards || WARD_GROUPS.GROUP_A;
-  const im2Wards = activeInternGroups.find(g => g.id === 'im_2')?.wards || WARD_GROUPS.GROUP_B;
+  // 인턴 역할별 담당 병동 그룹 해석 (7개 그룹 정규화: 주간 2개, 당직 2개, 비내과 3개)
+  const activeInternGroups = normalizeInternWardGroups(
+    (internWardGroups && internWardGroups.length > 0) ? internWardGroups : initialInternWardGroups
+  );
+
+  const imDay1Wards = activeInternGroups.find(g => g.id === 'im_day_1')?.wards || ['61', '61병동'];
+  const imDay2Wards = activeInternGroups.find(g => g.id === 'im_day_2')?.wards || ['MICU', '42', '42병동', '62', '62병동', '71', '71병동', '72', '72병동', '81', '81병동', '82', '82병동', '92', '92병동', '101', '101병동', '102', '102병동', '111', '111병동', '112', '112병동', '121', '121병동'];
+  const imDuty1Wards = activeInternGroups.find(g => g.id === 'im_duty_1')?.wards || ['MICU', '42', '42병동', '61', '61병동', '62', '62병동', '82', '82병동', '92', '92병동', '102', '102병동'];
+  const imDuty2Wards = activeInternGroups.find(g => g.id === 'im_duty_2')?.wards || ['71', '71병동', '72', '72병동', '81', '81병동', '101', '101병동', '111', '111병동', '112', '112병동', '121', '121병동'];
+
   const nonIm1Wards = activeInternGroups.find(g => g.id === 'non_im_1')?.wards || ['응급실', '수술실', 'DR', 'DSR'];
   const nonIm2Wards = activeInternGroups.find(g => g.id === 'non_im_2')?.wards || WARD_GROUPS.GROUP_C;
   const nonIm3Wards = activeInternGroups.find(g => g.id === 'non_im_3')?.wards || WARD_GROUPS.GROUP_D;
 
-  const isIM1Ward = im1Wards.some(w => areWardsEqual(w, selectedWard));
-  const isIM2Ward = im2Wards.some(w => areWardsEqual(w, selectedWard));
+  const isIMDay1Ward = imDay1Wards.some(w => areWardsEqual(w, selectedWard));
+  const isIMDay2Ward = imDay2Wards.some(w => areWardsEqual(w, selectedWard));
+  const isIMDuty1Ward = imDuty1Wards.some(w => areWardsEqual(w, selectedWard));
+  const isIMDuty2Ward = imDuty2Wards.some(w => areWardsEqual(w, selectedWard));
+
   const isNonIM1Ward = nonIm1Wards.some(w => areWardsEqual(w, selectedWard));
   const isNonIM2Ward = nonIm2Wards.some(w => areWardsEqual(w, selectedWard));
   const isNonIM3Ward = nonIm3Wards.some(w => areWardsEqual(w, selectedWard));
 
+  // 현재 시간대(주간 vs 당직)에 따른 내과 활성 그룹 매칭
+  const isIM1Ward = isDutyHours ? isIMDuty1Ward : isIMDay1Ward;
+  const isIM2Ward = isDutyHours ? isIMDuty2Ward : isIMDay2Ward;
+
   // 병동 그룹군 분류 및 명칭
   let matchedWardGroup = '';
   if (selectedDept === '내과') {
-    if (isIM1Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_1')?.title || '내과계 병동 Group 1 (MICU 등)';
-    else if (isIM2Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_2')?.title || '내과계 병동 Group 2';
-    else matchedWardGroup = '내과계 기타 병동';
+    if (isDutyHours) {
+      if (isIMDuty1Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_duty_1')?.title || '내과 당직 1 (MICU / Group 1)';
+      else if (isIMDuty2Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_duty_2')?.title || '내과 당직 2 (Group 2)';
+      else matchedWardGroup = '내과계 당직 기타 병동';
+    } else {
+      if (isIMDay1Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_day_1')?.title || '내과 1 (61병동 전담)';
+      else if (isIMDay2Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'im_day_2')?.title || '내과 2 (61 제외 전병동/ICU)';
+      else matchedWardGroup = '내과계 주간 기타 병동';
+    }
   } else {
     if (isNonIM1Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'non_im_1')?.title || '비내과계 응급/지정 병동';
     else if (isNonIM2Ward) matchedWardGroup = activeInternGroups.find(g => g.id === 'non_im_2')?.title || '비내과계 병동 Group C (SICU/외과계)';
@@ -274,13 +310,22 @@ export function evaluateDutyRules(
     else if (selectedDept === '내과') {
       // 0. 수혈 동의서 (상시 인턴 전담 - 전담간호사 지원 불가)
       if (isTask('수혈')) {
-        const isGroupB = isIM2Ward;
-        if (isGroupB) {
-          assignedRole = ROLES.IM_2;
-          notes = `내과계 병동 Group 2(${selectedWard}) 수혈 동의서는 내과 인턴 2 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+        if (isDutyHours) {
+          if (isIMDuty2Ward) {
+            assignedRole = ROLES.IM_DUTY_2;
+            notes = `당직시간 내과계 병동 Group 2(${selectedWard}) 수혈 동의서는 내과인턴당직2 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          } else {
+            assignedRole = ROLES.IM_DUTY_1;
+            notes = `당직시간 내과계 병동 Group 1/MICU(${selectedWard}) 수혈 동의서는 내과인턴당직1 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          }
         } else {
-          assignedRole = ROLES.IM_1;
-          notes = `내과계 병동 Group 1(${selectedWard}) 수혈 동의서는 내과 인턴 1 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          if (isIMDay1Ward) {
+            assignedRole = ROLES.IM_1;
+            notes = `평일 주간 61병동 수혈 동의서는 내과 1 (61병동 전담) 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          } else {
+            assignedRole = ROLES.IM_2;
+            notes = `평일 주간 ${selectedWard} 수혈 동의서는 내과 2 (전병동/ICU) 담당입니다 (전담간호사 지원 불가, 개인 UCAP 연결).`;
+          }
         }
       }
       // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
@@ -304,70 +349,81 @@ export function evaluateDutyRules(
           assignedRole = ROLES.COMMON_NURSE;
           notes = '병동 전담간호사 업무 지원 시간대(08:00~22:00) 내에 해당 병동 담당 공통 전담간호사가 취득합니다.';
         } else {
-          assignedRole = ROLES.IM_1;
-          notes = '심야(22:00~08:00) 조영제/진정 동의서는 당직 의료진이 취득합니다.';
+          assignedRole = isIMDuty2Ward ? ROLES.IM_DUTY_2 : ROLES.IM_DUTY_1;
+          notes = `심야(22:00~08:00) 조영제/진정 동의서는 내과 당직 의료진(${assignedRole})이 취득합니다.`;
         }
       }
-      else if (isRegularHours) {
-        // 평일 정규시간 (08:00 ~ 17:00)
+      else if (isWeekdayDaytime) {
+        // ===================================================================
+        // 평일 주간 (08:01 ~ 17:00)
+        // 내과 1: 61병동 전담
+        // 내과 2: 61 제외 전병동 및 ICU
+        // ===================================================================
         if (isTask('그외 술기') || (isTask('동의서') && !isTask('수혈') && !isTask('마취'))) {
           assignedRole = ROLES.COMMON_NURSE;
-          notes = '평일 정규시간 내과계 일반 술기 및 동의서는 공통 전담간호사가 지원합니다.';
+          notes = '평일 주간 내과계 일반 술기 및 동의서는 공통 전담간호사가 지원합니다.';
         } else if (isTask('Primary Call')) {
           assignedRole = ROLES.DUTY_NURSE;
           notes = 'Primary Call은 전담간호사가 우선 접수합니다.';
-        } else if (isTask('ABGA') || isTask('Blood culture') || isTask('Line 채혈')) {
-          if (selectedWard === 'MICU') {
+        } else if (isTask('ABGA') || isTask('Blood culture') || isTask('Line 채혈') || isTask('라인 채혈')) {
+          if (isIMDay1Ward) {
             assignedRole = ROLES.IM_1;
-            notes = '평일 정규시간 MICU ABGA/Line 채혈은 내과 인턴(내과1) 담당입니다.';
+            notes = '평일 주간 61병동 ABGA/Line 채혈은 내과 1(61병동 전담) 담당입니다.';
+          } else if (selectedWard === 'MICU') {
+            assignedRole = ROLES.IM_2;
+            notes = '평일 주간 MICU ABGA/Line 채혈은 내과 2 담당입니다.';
           } else {
             assignedRole = ROLES.COMMON_NURSE;
-            notes = '평일 정규시간 일반병동 ABGA/Line 채혈은 공통 전담간호사 연결입니다.';
+            notes = '평일 주간 일반병동 ABGA/Line 채혈은 공통 전담간호사 연결입니다.';
           }
         } else {
-          // EKG(P), T-tube 교체 등 필수 술기 -> 병동 그룹(Group 1 vs Group 2)에 따라 내과1 또는 내과2
-          if (isIM2Ward) {
-            assignedRole = ROLES.IM_2;
-            notes = `평일 정규시간 ${selectedWard} (내과 Group 2) 필수 술기/심전도는 내과 인턴 2 담당입니다.`;
-          } else {
+          // EKG(P), T-tube 교체 등 필수 인턴 술기
+          if (isIMDay1Ward) {
             assignedRole = ROLES.IM_1;
-            notes = `평일 정규시간 ${selectedWard} (내과 Group 1) 필수 술기/심전도는 내과 인턴 1 담당입니다.`;
+            notes = `평일 주간 61병동 필수 술기/심전도는 내과 1(61병동 전담) 담당입니다.`;
+          } else {
+            assignedRole = ROLES.IM_2;
+            notes = `평일 주간 ${selectedWard} 필수 술기/심전도는 내과 2(61 제외 전병동/ICU) 담당입니다.`;
           }
         }
       } else {
-        // 정규시간 외 (평일 17:00~08:00, 주말/휴일 종일)
-        const isGroupA = isIM1Ward;
-        const isGroupB = isIM2Ward;
+        // ===================================================================
+        // 당직 시간 (평일 17:01 ~ 익일 08:00, 주말 및 공휴일 종일)
+        // 내과인턴당직 1: MICU 전담 + 일반병동 Group 1 (42, 61, 62, 82, 92, 102)
+        // 내과인턴당직 2: 일반병동 Group 2 (71, 72, 81, 101, 111, 112, 121)
+        // ===================================================================
+        const isDutyGroup1 = isIMDuty1Ward;
+        const isDutyGroup2 = isIMDuty2Ward;
 
-        if (isGroupA) {
-          // 병동 그룹 A (42, 61, 62, 82, 92, 102, MICU)
+        if (isDutyGroup1) {
+          // 당직 Group 1 (MICU 및 42, 61, 62, 82, 92, 102)
           if (isTask('Primary Call')) {
             assignedRole = ROLES.DUTY_NURSE;
-            notes = '병동 그룹 A의 Primary Call은 당직 전담간호사 담당입니다.';
+            notes = '내과 당직 Group 1 병동 Primary Call은 당직 전담간호사 담당입니다.';
           } else if (isTask('T-tube') || isTask('기관절개관')) {
             if (selectedWard === 'MICU') {
-              assignedRole = ROLES.IM_1;
-              notes = 'MICU T-tube 교체는 내과계 당직인턴 1 담당입니다.';
+              assignedRole = ROLES.IM_DUTY_1;
+              notes = '당직시간 MICU T-tube 교체는 내과인턴당직 1 담당입니다.';
             } else {
               assignedRole = '내과 전공의 (별도 콜 안내)';
               notes = '일반병동 Group 1 야간 요청 시 내과 전공의 별도 콜 안내 대상입니다.';
             }
           } else if (isTask('EKG') || isTask('수혈동의서') || isTask('사망선언')) {
-            // EKG(P), 수혈동의서, 사망선언 -> 내과 당직인턴 1 (개인 UCAP 매칭)
-            assignedRole = ROLES.IM_1;
-            notes = '내과 당직인턴 1 담당 (개인 UCAP로 직접 연결됩니다).';
+            // EKG(P), 수혈동의서, 사망선언 -> 내과인턴당직 1
+            assignedRole = ROLES.IM_DUTY_1;
+            notes = `내과인턴당직 1 담당 (${selectedWard} / 개인 UCAP로 직접 연결됩니다).`;
           } else if (isTask('ABGA') || isTask('Blood culture') || isTask('채혈')) {
             if (selectedWard === 'MICU') {
-              assignedRole = ROLES.IM_1;
-              notes = 'MICU 병동의 ABGA 및 라인 채혈은 내과 당직인턴 1 담당입니다.';
+              assignedRole = ROLES.IM_DUTY_1;
+              notes = '당직시간 MICU ABGA 및 라인 채혈은 내과인턴당직 1 담당입니다.';
             } else {
-              // 그 외 병동: 22:00~08:00은 당직 전담간호사, 17:00~22:00/주말 낮시간은 공통 전담간호사
+              // 일반병동 Group 1: 22:00~08:00은 당직 전담간호사, 17:01~22:00 및 주말 낮시간은 공통 전담간호사
               if (isNightHours) {
                 assignedRole = ROLES.DUTY_NURSE;
-                notes = '야간(22:00~08:00) 병동 ABGA/Line 채혈은 당직 전담간호사 담당입니다.';
+                notes = '야간(22:00~08:00) Group 1 병동 ABGA/Line 채혈은 당직 전담간호사 담당입니다.';
               } else {
                 assignedRole = ROLES.COMMON_NURSE;
-                notes = '17:00~22:00(주말 낮) 병동 ABGA/Line 채혈은 공통 전담간호사 담당입니다.';
+                notes = '17:01~22:00(주말 낮) 병동 ABGA/Line 채혈은 공통 전담간호사 담당입니다.';
               }
             }
           } else {
@@ -377,30 +433,31 @@ export function evaluateDutyRules(
               notes = '야간(22:00~08:00) 그외 술기 및 동의서는 당직 전담간호사 담당입니다.';
             } else {
               assignedRole = ROLES.COMMON_NURSE;
-              notes = '17:00~22:00(주말 낮) 그외 술기 및 동의서는 공통 전담간호사 담당입니다.';
+              notes = '17:01~22:00(주말 낮) 그외 술기 및 동의서는 공통 전담간호사 담당입니다.';
             }
           }
-        } else if (isGroupB) {
-          // 병동 그룹 B (71, 72, 81, 101, 111, 112)
+        } else if (isDutyGroup2) {
+          // 당직 Group 2 (71, 72, 81, 101, 111, 112, 121)
           if (isTask('EKG') || isTask('수혈동의서') || isTask('T-tube') || isTask('사망선언')) {
-            // EKG(P), 수혈동의서, T-tube 교체, 사망선언 -> 내과 당직인턴 2 (개인 UCAP 매칭)
-            assignedRole = ROLES.IM_2;
-            notes = '내과 당직인턴 2 담당 (개인 UCAP로 직접 연결됩니다).';
+            // EKG(P), 수혈동의서, T-tube 교체, 사망선언 -> 내과인턴당직 2
+            assignedRole = ROLES.IM_DUTY_2;
+            notes = `내과인턴당직 2 담당 (${selectedWard} / 개인 UCAP로 직접 연결됩니다).`;
           } else if (isTask('ABGA') || isTask('Blood culture') || isTask('채혈') || isTask('그외 술기') || isTask('동의서')) {
-            // 22:00~08:00에는 내과 당직인턴 2 / 그 외 시간은 공통 전담간호사
+            // 22:00~08:00에는 내과인턴당직 2 / 17:01~22:00 및 주말 낮은 공통 전담간호사
             if (isNightHours) {
-              assignedRole = ROLES.IM_2;
-              notes = '야간(22:00~08:00) 병동 술기/채혈은 내과 당직인턴 2 담당입니다.';
+              assignedRole = ROLES.IM_DUTY_2;
+              notes = '야간(22:00~08:00) Group 2 병동 술기/채혈은 내과인턴당직 2 담당입니다.';
             } else {
               assignedRole = ROLES.COMMON_NURSE;
-              notes = '17:00~22:00(주말 낮) 병동 술기/채혈은 공통 전담간호사 담당입니다.';
+              notes = '17:01~22:00(주말 낮) 병동 술기/채혈은 공통 전담간호사 담당입니다.';
             }
           } else {
-            assignedRole = ROLES.IM_2;
+            assignedRole = ROLES.IM_DUTY_2;
+            notes = `내과인턴당직 2 담당 (${selectedWard}).`;
           }
         } else {
-          // 기타 병동
-          assignedRole = isNightHours ? ROLES.IM_1 : ROLES.COMMON_NURSE;
+          // 기타 내과계 병동
+          assignedRole = isNightHours ? ROLES.IM_DUTY_1 : ROLES.COMMON_NURSE;
         }
       }
     }
@@ -524,9 +581,13 @@ export function evaluateDutyRules(
   if (matchedTaskItem && (matchedTaskItem.isNurseSupport === 'N' || matchedTaskItem.isNurseSupport === false)) {
     if (assignedRole === ROLES.COMMON_NURSE || assignedRole === ROLES.DUTY_NURSE) {
       if (selectedDept === '내과') {
-        const isGroupB = isIM2Ward;
-        assignedRole = isGroupB ? ROLES.IM_2 : ROLES.IM_1;
-        notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 내과 ${assignedRole === ROLES.IM_2 ? '인턴 2' : '인턴 1'}로 연결됩니다.`;
+        if (isDutyHours) {
+          assignedRole = isIMDuty2Ward ? ROLES.IM_DUTY_2 : ROLES.IM_DUTY_1;
+          notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, ${assignedRole === ROLES.IM_DUTY_2 ? '내과인턴당직 2' : '내과인턴당직 1'}로 연결됩니다.`;
+        } else {
+          assignedRole = isIMDay1Ward ? ROLES.IM_1 : ROLES.IM_2;
+          notes = `${matchedTaskItem.name}은(는) 업무마스터 규정상 전담간호사 지원 불가 업무로, 내과 ${assignedRole === ROLES.IM_1 ? '인턴 1 (61병동 전담)' : '인턴 2'}로 연결됩니다.`;
+        }
       } else {
         const isGroupC = isNonIM2Ward;
         assignedRole = isGroupC ? ROLES.NON_IM_2 : (isNonIM1Ward ? ROLES.NON_IM_1 : ROLES.NON_IM_3);
@@ -679,7 +740,11 @@ export function evaluateDutyRules(
   // 일반 인턴 및 당직의 매칭
   else if (assignedRole) {
     if (assignedRole === ROLES.INTERN) {
-      assignedRole = selectedDept === '내과' ? (isIM2Ward ? ROLES.IM_2 : ROLES.IM_1) : (isNonIM2Ward ? ROLES.NON_IM_2 : (isNonIM1Ward ? ROLES.NON_IM_1 : ROLES.NON_IM_3));
+      if (selectedDept === '내과') {
+        assignedRole = isDutyHours ? (isIMDuty2Ward ? ROLES.IM_DUTY_2 : ROLES.IM_DUTY_1) : (isIMDay1Ward ? ROLES.IM_1 : ROLES.IM_2);
+      } else {
+        assignedRole = isNonIM2Ward ? ROLES.NON_IM_2 : (isNonIM1Ward ? ROLES.NON_IM_1 : ROLES.NON_IM_3);
+      }
     }
     const todaysSchedule = schedules[selectedDate];
     if (todaysSchedule) {

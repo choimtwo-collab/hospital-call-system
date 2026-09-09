@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <title>병원 콜 라우팅 시스템 차세대 디자인 시안</title>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      margin: 0;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #38bdf8;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: #94a3b8;
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 50px;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+    }
+
+    .card p {
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 2px solid #0284c7;
+      margin-top: 15px;
+      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.2);
+    }
+
+    .mobile-img-wrapper {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🏥 병원 콜 라우팅 시스템 차세대 UI/UX 디자인 시안</h1>
+  <p class="subtitle">간호사실 스테이션 PC 및 병동 순회용 스마트폰을 위한 고화질 디자인 목업</p>
+
+  <div class="container">
+    <!-- Desktop Card -->
+    <div class="card">
+      <h2>🖥️ 1. 데스크톱 대시보드 시안 (간호사실 스테이션 PC 최적화)</h2>
+      <p>
+        • <strong>3단 레이아웃</strong>: 좌측 스마트 필터(진료과/병동/업무) | 중앙 최우선 당직의 히어로 카드(초대형 UCAP 발광 다이얼) | 우측 백업 라인 & 긴급 핫라인<br>
+        • <strong>클리니컬 다크 모드</strong>: 야간 근무 시 간호사 눈 피로 경감 및 호출 번호 시인성 극대화
+      </p>
+      <img src="desktop_design.jpg" alt="Desktop UI Mockup">
+    </div>
+
+    <!-- Mobile Card -->
+    <div class="card">
+      <h2>📱 2. 모바일 스마트폰 뷰 시안 (병동 순회용 스마트폰 최적화)</h2>
+      <p>
+        • <strong>원핸드 탭</strong>: 상단 4대 핵심 업무(EKG, 수혈, L-tube, ABGA) 1초 퀵필터 및 중앙 대형 다이얼 버튼<br>
+        • <strong>에스컬레이션 백업 라인</strong>: 1순위 부재 시 2순위/3순위 즉시 발신 및 하단 비상 핫라인(코드블루)
+      </p>
+      <div class="mobile-img-wrapper">
+        <img src="mobile_design.jpg" alt="Mobile UI Mockup">
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

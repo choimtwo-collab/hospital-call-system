@@ -12,6 +12,8 @@ export const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일',
 export const ROLES = {
   IM_1: '내과1 (인턴1)',
   IM_2: '내과2 (인턴2)',
+  IM_DUTY_1: '내과인턴당직1',
+  IM_DUTY_2: '내과인턴당직2',
   NON_IM_1: '비내과1 (당직인턴1)',
   NON_IM_2: '비내과2 (당직인턴2)',
   NON_IM_3: '비내과3 (당직인턴3)',
@@ -22,7 +24,7 @@ export const ROLES = {
 };
 
 /**
- * 주어진 당직 역할명(예: '내과 1', '내과1', '내과1 (인턴1)')과 연관된 모든 표준/별칭 키 목록을 반환합니다.
+ * 주어진 당직 역할명(예: '내과 1', '내과1', '내과인턴당직1')과 연관된 모든 표준/별칭 키 목록을 반환합니다.
  */
 export function getRelatedRoleKeys(role: string): string[] {
   if (!role) return [];
@@ -47,7 +49,19 @@ export function getRelatedRoleKeys(role: string): string[] {
       keys.add('당직인턴3');
     }
   } else if (clean.includes('내과') || clean.includes('im')) {
-    if (clean.includes('1') || clean.includes('인턴1')) {
+    if (clean.includes('당직1') || clean.includes('당직인턴1')) {
+      keys.add(ROLES.IM_DUTY_1);
+      keys.add('내과인턴당직1');
+      keys.add('내과인턴당직 1');
+      keys.add('내과당직 1');
+      keys.add('내과당직1');
+    } else if (clean.includes('당직2') || clean.includes('당직인턴2')) {
+      keys.add(ROLES.IM_DUTY_2);
+      keys.add('내과인턴당직2');
+      keys.add('내과인턴당직 2');
+      keys.add('내과당직 2');
+      keys.add('내과당직2');
+    } else if (clean.includes('1') || clean.includes('인턴1')) {
       keys.add(ROLES.IM_1); // '내과1 (인턴1)'
       keys.add('내과 1');
       keys.add('내과1');
@@ -88,38 +102,81 @@ export const WARD_GROUPS = {
   GROUP_D: ['71병동', '72병동', '81병동', '82병동', '92병동', '101병동', '102병동', '111병동', '112병동', '121병동']
 };
 
-// 인턴 역할별 기본 담당 병동 그룹 설정 (내과1, 내과2, 비내과1, 비내과2, 비내과3)
+// 인턴 역할별 기본 담당 병동 그룹 설정 (주간/당직 분리형 내과 4개 + 비내과 3개)
 export const initialInternWardGroups: InternWardGroupSetting[] = [
+  // ─── [내과계 평일 주간 (08:01 ~ 17:00)] ───
   {
-    id: 'im_1',
+    id: 'im_day_1',
     roleKey: ROLES.IM_1,
-    roleName: '내과1 (인턴1)',
+    roleName: '내과1 (주간)',
     shortName: '내과 1',
     dept: '내과',
-    title: '내과계 병동 Group 1 (MICU 등)',
-    wards: ['42병동', '61병동', '62병동', '82병동', '92병동', '102병동', 'MICU', 'AKU', '주사실', '한방'],
+    timeCategory: 'DAY',
+    timeDescription: '평일 주간 08:01 ~ 17:00',
+    title: '61병동 전담',
+    wards: ['61병동'],
     defaultPhone: '근무표 참조',
     defaultUcap: '개인 UCAP',
-    description: 'MICU 및 42, 61, 62, 82, 92, 102병동 등 내과계 전담'
+    description: '61병동 모든 일반 업무 및 EKG, 수혈동의서, T-tube, ABGA, Line 채혈 전담'
   },
   {
-    id: 'im_2',
+    id: 'im_day_2',
     roleKey: ROLES.IM_2,
-    roleName: '내과2 (인턴2)',
+    roleName: '내과2 (주간)',
     shortName: '내과 2',
     dept: '내과',
-    title: '내과계 병동 Group 2 (71, 72, 81W 등)',
+    timeCategory: 'DAY',
+    timeDescription: '평일 주간 08:01 ~ 17:00',
+    title: '61 제외 전 병동 및 ICU',
+    wards: [
+      '42병동', '62병동', '71병동', '72병동', '81병동', '82병동',
+      '92병동', '101병동', '102병동', '111병동', '112병동', '121병동',
+      'MICU', 'AKU', '주사실', '한방'
+    ],
+    defaultPhone: '근무표 참조',
+    defaultUcap: '개인 UCAP',
+    description: '61 제외 전 병동 및 ICU 추가심전도(EKG), 수혈동의서, T-tube, ABGA, Line 채혈'
+  },
+
+  // ─── [내과계 당직 / 야간 / 주말·공휴일] ───
+  {
+    id: 'im_duty_1',
+    roleKey: ROLES.IM_DUTY_1,
+    roleName: '내과인턴당직 1',
+    shortName: '당직 1',
+    dept: '내과',
+    timeCategory: 'DUTY',
+    timeDescription: '평일 17:01~익일 08:00 / 주말·공휴일 종일',
+    title: 'MICU 및 병동 Group 1 (42, 61, 62, 82, 92, 102병동)',
+    wards: ['MICU', '42병동', '61병동', '62병동', '82병동', '92병동', '102병동', 'AKU', '주사실', '한방'],
+    defaultPhone: '근무표 참조',
+    defaultUcap: '개인 UCAP',
+    description: 'MICU 모든 술기/채혈 + 일반병동 Group 1 추가심전도(EKG), 수혈동의서, 사망선언'
+  },
+  {
+    id: 'im_duty_2',
+    roleKey: ROLES.IM_DUTY_2,
+    roleName: '내과인턴당직 2',
+    shortName: '당직 2',
+    dept: '내과',
+    timeCategory: 'DUTY',
+    timeDescription: '평일 17:01~익일 08:00 / 주말·공휴일 종일',
+    title: '병동 Group 2 (71, 72, 81, 101, 111, 112, 121병동)',
     wards: ['71병동', '72병동', '81병동', '101병동', '111병동', '112병동', '121병동'],
     defaultPhone: '근무표 참조',
     defaultUcap: '개인 UCAP',
-    description: '71, 72, 81, 101, 111, 112, 121병동 등 내과계 전담'
+    description: 'Group 2 병동 2당직 업무 + EKG, 수혈, T-tube, 사망선언, ABGA, Line 채혈'
   },
+
+  // ─── [비내과계 인턴 병동 그룹] ───
   {
     id: 'non_im_1',
     roleKey: ROLES.NON_IM_1,
     roleName: '비내과1 (당직인턴1)',
     shortName: '비내과 1',
     dept: '비내과',
+    timeCategory: 'ALL',
+    timeDescription: '상시 / 당직',
     title: '비내과계 응급수술/시술 및 지정 담당 병동',
     wards: ['응급실', '수술실', 'DR', 'DSR'],
     defaultPhone: '010-7628-5803',
@@ -132,6 +189,8 @@ export const initialInternWardGroups: InternWardGroupSetting[] = [
     roleName: '비내과2 (당직인턴2)',
     shortName: '비내과 2',
     dept: '비내과',
+    timeCategory: 'ALL',
+    timeDescription: '상시 / 당직',
     title: '비내과계 병동 Group C (SICU/외과계)',
     wards: ['SICU', '분만장', 'DR', 'DSR', '42병동', '61병동', '62병동', 'NICU'],
     defaultPhone: '010-7624-5803',
@@ -144,6 +203,8 @@ export const initialInternWardGroups: InternWardGroupSetting[] = [
     roleName: '비내과3 (당직인턴3)',
     shortName: '비내과 3',
     dept: '비내과',
+    timeCategory: 'ALL',
+    timeDescription: '상시 / 당직',
     title: '비내과계 병동 Group D (71~121병동 등)',
     wards: ['71병동', '72병동', '81병동', '82병동', '92병동', '101병동', '102병동', '111병동', '112병동', '121병동'],
     defaultPhone: '010-5794-4170',
@@ -151,6 +212,30 @@ export const initialInternWardGroups: InternWardGroupSetting[] = [
     description: '71, 72, 81, 82, 92, 101, 102, 111, 112, 121병동 등 비내과계 전담'
   }
 ];
+
+export function normalizeInternWardGroups(groups?: InternWardGroupSetting[]): InternWardGroupSetting[] {
+  if (!groups || groups.length === 0) return initialInternWardGroups;
+  const hasDay1 = groups.some(g => g.id === 'im_day_1');
+  if (hasDay1) return groups;
+
+  // 기존 im_1, im_2를 당직 그룹으로 마이그레이션하고 주간 그룹 추가
+  const oldIm1 = groups.find(g => g.id === 'im_1');
+  const oldIm2 = groups.find(g => g.id === 'im_2');
+  const nonIms = groups.filter(g => g.dept === '비내과');
+
+  const defDay1 = initialInternWardGroups.find(g => g.id === 'im_day_1')!;
+  const defDay2 = initialInternWardGroups.find(g => g.id === 'im_day_2')!;
+  const defDuty1 = initialInternWardGroups.find(g => g.id === 'im_duty_1')!;
+  const defDuty2 = initialInternWardGroups.find(g => g.id === 'im_duty_2')!;
+
+  return [
+    defDay1,
+    defDay2,
+    oldIm1 ? { ...defDuty1, wards: oldIm1.wards, title: oldIm1.title } : defDuty1,
+    oldIm2 ? { ...defDuty2, wards: oldIm2.wards, title: oldIm2.title } : defDuty2,
+    ...(nonIms.length > 0 ? nonIms : initialInternWardGroups.filter(g => g.dept === '비내과'))
+  ];
+}
 
 export const WARD_OPTIONS: Record<DepartmentType, string[]> = {
   '내과': [
@@ -548,12 +633,12 @@ export const initialCustomRules: CustomRule[] = [
 // 인턴 마스터 (대구분: 내과/비내과, 중구분: 개인폰/개인 UCAP)
 export const initialInterns: InternDoctor[] = [
   // 내과계 전공의
-  { id: 'int-im-1', name: '이준재', dept: 'IM', category: '내과', ucap: '52606', phone: '010-5829-4019' },
-  { id: 'int-im-2', name: '박신희', dept: 'IM', category: '내과', ucap: '52634', phone: '010-9182-3847' },
-  { id: 'int-im-3', name: '전지연', dept: 'IM', category: '내과', ucap: '52642', phone: '010-4829-1920' },
-  { id: 'int-im-4', name: '정소영', dept: 'IM', category: '내과', ucap: '52644', phone: '010-3948-1029' },
-  { id: 'int-im-5', name: '박수현', dept: 'IM(분)', category: '내과', ucap: '52633', phone: '010-2938-4710' },
-  { id: 'int-im-6', name: '신정민', dept: 'IM(분)', category: '내과', ucap: '52637', phone: '010-5928-1039' },
+  { id: 'int-im-1', name: '이준재', dept: 'IM', category: '내과', ucap: '52606', phone: '010-6221-3553' },
+  { id: 'int-im-2', name: '박신희', dept: 'IM', category: '내과', ucap: '52634', phone: '010-9229-6625' },
+  { id: 'int-im-3', name: '전지연', dept: 'IM', category: '내과', ucap: '52642', phone: '010-4670-6365' },
+  { id: 'int-im-4', name: '정소영', dept: 'IM', category: '내과', ucap: '52644', phone: '010-8644-9247' },
+  { id: 'int-im-5', name: '박수현', dept: 'IM(호흡기)', category: '내과', ucap: '52633', phone: '010-2194-3102' },
+  { id: 'int-im-6', name: '신정민', dept: 'IM(심장)', category: '내과', ucap: '52637', phone: '010-8919-7617' },
   { id: 'int-im-7', name: '유성윤', dept: 'PED/NP', category: '내과', ucap: '52604', phone: '010-9281-0492' },
   { id: 'int-im-8', name: '전하윤', dept: 'NP/PED', category: '내과', ucap: '52643', phone: '010-2938-1029' },
 

@@ -42,12 +42,14 @@ export interface CNGroupSchedule {
 }
 
 export interface InternWardGroupSetting {
-  id: string; // 'im_1' | 'im_2' | 'non_im_1' | 'non_im_2' | 'non_im_3'
-  roleKey: string; // e.g. ROLES.IM_1
-  roleName: string; // e.g. '내과1 (인턴1)'
-  shortName: string; // e.g. '내과 1'
+  id: string; // 'im_day_1' | 'im_day_2' | 'im_duty_1' | 'im_duty_2' | 'non_im_1' | 'non_im_2' | 'non_im_3' | etc.
+  roleKey: string; // e.g. ROLES.IM_1, ROLES.IM_DUTY_1
+  roleName: string; // e.g. '내과1 (주간)', '내과인턴당직 1'
+  shortName: string; // e.g. '내과 1', '당직 1'
   dept: '내과' | '비내과';
-  title: string; // e.g. '내과계 병동 Group 1 (MICU 등)'
+  timeCategory?: 'DAY' | 'DUTY' | 'ALL'; // 주간 / 당직 / 상시 구분
+  timeDescription?: string; // e.g. '평일 주간 08:01 ~ 17:00'
+  title: string; // e.g. '61병동 전담', '내과계 병동 Group 1 (MICU 등)'
   wards: string[];
   defaultPhone?: string;
   defaultUcap?: string;

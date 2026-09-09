@@ -4,11 +4,12 @@ import {
   RotateCcw, Download, Upload, Save, CheckCircle2, AlertCircle, Search,
   FileSpreadsheet, Sliders, Tag, ArrowRight, Shield, ToggleLeft, ToggleRight,
   HelpCircle, ChevronDown, Sparkles, Filter, Edit3, X, RefreshCw, Building2,
-  PhoneCall, ShieldCheck, HeartPulse, Lock
+  PhoneCall, ShieldCheck, HeartPulse, Lock, FileText, Sun, Moon
 } from 'lucide-react';
 import { 
   ROLES, DAYS_OF_WEEK, ALL_WARDS, WARD_GROUPS, WARD_OPTIONS, getCNPostContact, areWardsEqual, initialTasks,
-  emergencyContacts as defaultEmergencyContacts, initialInternWardGroups, getRelatedRoleKeys
+  emergencyContacts as defaultEmergencyContacts, initialInternWardGroups, getRelatedRoleKeys,
+  normalizeInternWardGroups
 } from '../data/initialData';
 import { 
   ContactMap, DateScheduleMap, TimeSlot, CNPost, WeeklyCNScheduleMap,
@@ -911,9 +912,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   // --- Intern Ward Groups Handlers (내과 1·2, 비내과 1·2·3) ---
+  // --- Intern Ward Groups Handlers (내과 주간 1·2, 내과 당직 1·2, 비내과 1·2·3) ---
   const handleToggleWardForIntern = (roleId: string, ward: string) => {
     if (!setInternWardGroups) return;
-    const updated = (internWardGroups || []).map(g => {
+    const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+    const updated = baseGroups.map(g => {
       if (g.id !== roleId) return g;
       const exists = g.wards.some(w => areWardsEqual(w, ward));
       const updatedWards = exists
@@ -922,35 +925,43 @@ export const AdminView: React.FC<AdminViewProps> = ({
       return { ...g, wards: updatedWards };
     });
     setInternWardGroups(updated);
+    saveSetting('intern_ward_groups', updated).catch(console.error);
   };
 
   const handleSetWardsForIntern = (roleId: string, wards: string[]) => {
     if (!setInternWardGroups) return;
-    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...g, wards } : g);
+    const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+    const updated = baseGroups.map(g => g.id === roleId ? { ...g, wards } : g);
     setInternWardGroups(updated);
+    saveSetting('intern_ward_groups', updated).catch(console.error);
   };
 
   const handleUpdateInternGroupTitle = (roleId: string, newTitle: string) => {
     if (!setInternWardGroups) return;
-    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...g, title: newTitle } : g);
+    const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+    const updated = baseGroups.map(g => g.id === roleId ? { ...g, title: newTitle } : g);
     setInternWardGroups(updated);
+    saveSetting('intern_ward_groups', updated).catch(console.error);
   };
 
   const handleSyncInternGroupTitleWithWards = (roleId: string) => {
     if (!setInternWardGroups) return;
-    const updated = (internWardGroups || []).map(g => {
+    const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+    const updated = baseGroups.map(g => {
       if (g.id !== roleId) return g;
       const newTitle = g.wards.length > 0 ? `${g.shortName} 관할 (${g.wards.join(', ')})` : `${g.shortName} 병동 그룹`;
       return { ...g, title: newTitle };
     });
     setInternWardGroups(updated);
+    saveSetting('intern_ward_groups', updated).catch(console.error);
     showSaveSuccess('병동 목록으로 명칭이 자동 반영되었습니다.');
   };
 
   const handleResetInternWardGroups = () => {
-    if (confirm('내과 1·2, 비내과 1·2·3의 모든 담당 병동 그룹을 시스템 표준 기본값으로 초기화하시겠습니까?')) {
+    if (confirm('내과 주간 1·2, 내과 당직 1·2, 비내과 1·2·3의 모든 담당 병동 그룹을 시스템 표준 기본값으로 초기화하시겠습니까?')) {
       if (setInternWardGroups) {
         setInternWardGroups(initialInternWardGroups);
+        saveSetting('intern_ward_groups', initialInternWardGroups).catch(console.error);
       }
       showSaveSuccess('인턴 담당 병동 그룹이 표준 기본값으로 초기화되었습니다.');
     }
@@ -959,8 +970,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleResetSingleInternWardGroup = (roleId: string) => {
     const defaultGrp = initialInternWardGroups.find(g => g.id === roleId);
     if (!defaultGrp || !setInternWardGroups) return;
-    const updated = (internWardGroups || []).map(g => g.id === roleId ? { ...defaultGrp } : g);
+    const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+    const updated = baseGroups.map(g => g.id === roleId ? { ...defaultGrp } : g);
     setInternWardGroups(updated);
+    saveSetting('intern_ward_groups', updated).catch(console.error);
     showSaveSuccess(`[${defaultGrp.shortName}] 담당 병동이 기본값으로 복원되었습니다.`);
   };
 
@@ -1421,122 +1434,260 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </div>
               </div>
 
-              {/* 1. 내과계 인턴 역할군 (내과 1, 내과 2) */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-                  <h5 className="text-xs sm:text-sm font-black text-cyan-300 tracking-wider">
-                    내과계 인턴 병동 그룹 (내과 1, 내과 2)
-                  </h5>
-                </div>
+              {/* 1. 내과계 인턴 역할군 (평일 주간 vs 당직/야간/주말 분리 셋팅) */}
+              {(() => {
+                const activeGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+                const dayGroups = activeGroups.filter(g => g.dept === '내과' && (g.timeCategory === 'DAY' || g.id === 'im_day_1' || g.id === 'im_day_2'));
+                const dutyGroups = activeGroups.filter(g => g.dept === '내과' && (g.timeCategory === 'DUTY' || g.id === 'im_duty_1' || g.id === 'im_duty_2'));
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {internWardGroups.filter(g => g.dept === '내과').map(grp => (
-                    <div 
-                      key={grp.id}
-                      className="glass-panel p-5 rounded-3xl border border-slate-700/70 hover:border-cyan-500/50 bg-slate-900/80 shadow-xl space-y-4 transition group"
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center font-black text-sm text-cyan-400">
-                            {grp.shortName.slice(-1)}
-                          </div>
-                          <div>
-                            <div className="text-sm font-extrabold text-white flex items-center gap-2">
-                              {grp.roleName}
-                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-cyan-950 text-cyan-300 border border-cyan-800/60">
-                                {grp.dept}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-400 mt-0.5">
-                              {grp.description || '내과계 당직 담당'}
-                            </div>
-                          </div>
+                return (
+                  <div className="space-y-6">
+                    {/* 1-A. 평일 주간 (08:01 ~ 17:00) */}
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-amber-500/20 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Sun className="w-4 h-4 text-amber-400" />
+                          <h5 className="text-xs sm:text-sm font-black text-amber-300 tracking-wider">
+                            ☀️ 평일 주간 (08:01 ~ 17:00) 내과계 인턴 병동 그룹
+                          </h5>
                         </div>
-                        <span className="text-[11px] font-mono text-cyan-300 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
-                          {grp.defaultUcap || '개인 UCAP'}
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/60 w-fit">
+                          평일 주간 전담 (내과 1, 내과 2)
                         </span>
                       </div>
 
-                      {/* Group Title Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold text-slate-400">관할 병동 그룹 명칭</label>
-                          {grp.wards.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleSyncInternGroupTitleWithWards(grp.id)}
-                              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold underline"
-                              title="선택된 병동 목록으로 명칭 자동 채우기"
-                            >
-                              명칭 자동반영
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={grp.title}
-                          onChange={e => handleUpdateInternGroupTitle(grp.id, e.target.value)}
-                          placeholder="예: 내과계 병동 Group 1 (MICU 등)"
-                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400"
-                        />
-                      </div>
-
-                      {/* Assigned Wards List */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-bold">
-                            관할 병동 목록 (<strong className="text-cyan-400">{grp.wards.length}개</strong>)
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 min-h-[58px] max-h-36 overflow-y-auto p-2 bg-slate-950/80 rounded-2xl border border-slate-800">
-                          {grp.wards.length > 0 ? (
-                            grp.wards.map(w => (
-                              <span 
-                                key={w}
-                                className="px-2.5 py-1 rounded-xl bg-cyan-950/90 text-cyan-300 border border-cyan-800/60 text-xs font-extrabold flex items-center gap-1 shadow-sm group/chip"
-                              >
-                                <span>{w}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleWardForIntern(grp.id, w)}
-                                  className="text-cyan-500 hover:text-rose-400 text-xs font-black ml-0.5"
-                                  title={`${w} 해제`}
-                                >
-                                  ×
-                                </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {dayGroups.map(grp => (
+                          <div 
+                            key={grp.id}
+                            className="glass-panel p-5 rounded-3xl border border-amber-500/30 hover:border-amber-400/60 bg-slate-900/80 shadow-xl space-y-4 transition group"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-black text-sm text-amber-400">
+                                  {grp.shortName.slice(-1)}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-extrabold text-white flex items-center gap-2">
+                                    {grp.roleName}
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-950 text-amber-300 border border-amber-800/60">
+                                      {grp.timeDescription || '평일 주간 08:01~17:00'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5">
+                                    {grp.description || '평일 주간 내과계 전담'}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono text-amber-300 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                                {grp.defaultUcap || '개인 UCAP'}
                               </span>
-                            ))
-                          ) : (
-                            <div className="text-[11px] text-rose-400/90 font-bold p-1">
-                              ⚠️ 배정된 병동이 없습니다. 아래 버튼을 눌러 병동을 추가해주세요.
                             </div>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Card Footer Actions */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-                        <button
-                          type="button"
-                          onClick={() => setEditingInternWardsRoleId(grp.id)}
-                          className="px-3 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition flex items-center gap-1.5"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          병동 칩 선택/추가
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleResetSingleInternWardGroup(grp.id)}
-                          className="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-800 transition"
-                        >
-                          기본값 복원
-                        </button>
+                            {/* Group Title Input */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-bold text-slate-400">관할 병동 그룹 명칭</label>
+                                {grp.wards.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSyncInternGroupTitleWithWards(grp.id)}
+                                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
+                                    title="선택된 병동 목록으로 명칭 자동 채우기"
+                                  >
+                                    명칭 자동반영
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={grp.title}
+                                onChange={e => handleUpdateInternGroupTitle(grp.id, e.target.value)}
+                                placeholder="예: 내과 1 (61병동 전담)"
+                                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+
+                            {/* Assigned Wards List */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400 font-bold">
+                                  관할 병동 목록 (<strong className="text-amber-400">{grp.wards.length}개</strong>)
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 min-h-[58px] max-h-36 overflow-y-auto p-2 bg-slate-950/80 rounded-2xl border border-slate-800">
+                                {grp.wards.length > 0 ? (
+                                  grp.wards.map(w => (
+                                    <span 
+                                      key={w}
+                                      className="px-2.5 py-1 rounded-xl bg-amber-950/90 text-amber-300 border border-amber-800/60 text-xs font-extrabold flex items-center gap-1 shadow-sm group/chip"
+                                    >
+                                      <span>{w}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleWardForIntern(grp.id, w)}
+                                        className="text-amber-500 hover:text-rose-400 text-xs font-black ml-0.5"
+                                        title={`${w} 해제`}
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))
+                                ) : (
+                                  <div className="text-[11px] text-rose-400/90 font-bold p-1">
+                                    ⚠️ 배정된 병동이 없습니다. 아래 버튼을 눌러 병동을 추가해주세요.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Footer Actions */}
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                              <button
+                                type="button"
+                                onClick={() => setEditingInternWardsRoleId(grp.id)}
+                                className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-1.5"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                병동 칩 선택/추가
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleResetSingleInternWardGroup(grp.id)}
+                                className="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-800 transition"
+                              >
+                                기본값 복원
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+
+                    {/* 1-B. 당직 / 야간 / 주말·공휴일 (평일 17:01~익일 08:00, 주말 종일) */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-indigo-500/20 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Moon className="w-4 h-4 text-indigo-400" />
+                          <h5 className="text-xs sm:text-sm font-black text-indigo-300 tracking-wider">
+                            🌙 당직 / 야간 / 주말·공휴일 내과계 인턴 병동 그룹
+                          </h5>
+                        </div>
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 w-fit">
+                          당직 전담 (내과인턴당직 1, 내과인턴당직 2)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {dutyGroups.map(grp => (
+                          <div 
+                            key={grp.id}
+                            className="glass-panel p-5 rounded-3xl border border-indigo-500/30 hover:border-indigo-400/60 bg-slate-900/80 shadow-xl space-y-4 transition group"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-black text-sm text-indigo-400">
+                                  {grp.shortName.slice(-1)}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-extrabold text-white flex items-center gap-2">
+                                    {grp.roleName}
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/60">
+                                      {grp.timeDescription || '평일 17:01~익일08:00 / 주말'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5">
+                                    {grp.description || '내과계 당직 담당'}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-mono text-indigo-300 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                                {grp.defaultUcap || '개인 UCAP'}
+                              </span>
+                            </div>
+
+                            {/* Group Title Input */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-bold text-slate-400">관할 병동 그룹 명칭</label>
+                                {grp.wards.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSyncInternGroupTitleWithWards(grp.id)}
+                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold underline"
+                                    title="선택된 병동 목록으로 명칭 자동 채우기"
+                                  >
+                                    명칭 자동반영
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={grp.title}
+                                onChange={e => handleUpdateInternGroupTitle(grp.id, e.target.value)}
+                                placeholder="예: 내과 당직 1 (MICU / Group 1)"
+                                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-indigo-400"
+                              />
+                            </div>
+
+                            {/* Assigned Wards List */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400 font-bold">
+                                  관할 병동 목록 (<strong className="text-indigo-400">{grp.wards.length}개</strong>)
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 min-h-[58px] max-h-36 overflow-y-auto p-2 bg-slate-950/80 rounded-2xl border border-slate-800">
+                                {grp.wards.length > 0 ? (
+                                  grp.wards.map(w => (
+                                    <span 
+                                      key={w}
+                                      className="px-2.5 py-1 rounded-xl bg-indigo-950/90 text-indigo-300 border border-indigo-800/60 text-xs font-extrabold flex items-center gap-1 shadow-sm group/chip"
+                                    >
+                                      <span>{w}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleWardForIntern(grp.id, w)}
+                                        className="text-indigo-400 hover:text-rose-400 text-xs font-black ml-0.5"
+                                        title={`${w} 해제`}
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))
+                                ) : (
+                                  <div className="text-[11px] text-rose-400/90 font-bold p-1">
+                                    ⚠️ 배정된 병동이 없습니다. 아래 버튼을 눌러 병동을 추가해주세요.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Footer Actions */}
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                              <button
+                                type="button"
+                                onClick={() => setEditingInternWardsRoleId(grp.id)}
+                                className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                병동 칩 선택/추가
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleResetSingleInternWardGroup(grp.id)}
+                                className="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-800 transition"
+                              >
+                                기본값 복원
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 2. 비내과계 인턴 역할군 (비내과 1, 비내과 2, 비내과 3) */}
               <div className="space-y-3 pt-4">
@@ -1548,7 +1699,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {internWardGroups.filter(g => g.dept === '비내과').map(grp => (
+                  {normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups).filter(g => g.dept === '비내과').map(grp => (
                     <div 
                       key={grp.id}
                       className="glass-panel p-5 rounded-3xl border border-slate-700/70 hover:border-amber-500/50 bg-slate-900/80 shadow-xl space-y-4 transition group"
@@ -1663,7 +1814,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
           {/* MODAL: INTERN WARD CHIPS SELECTION POPOVER / MODAL */}
           {editingInternWardsRoleId && (() => {
-            const currentRole = internWardGroups.find(g => g.id === editingInternWardsRoleId);
+            const activeGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
+            const currentRole = activeGroups.find(g => g.id === editingInternWardsRoleId);
             if (!currentRole) return null;
 
             return (
@@ -4821,6 +4973,59 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <h4 className="text-sm font-bold text-rose-300">공장 초기값으로 리셋</h4>
               <p className="text-xs text-rose-400/80">LocalStorage에 저장된 모든 사용자 설정을 초기 데이터로 복구</p>
             </button>
+          </div>
+
+          {/* 시스템 개발 문서 및 Skill 파일 다운로드 전용 섹션 */}
+          <div className="pt-6 border-t border-slate-800 space-y-3">
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-cyan-400" />
+                시스템 개발 설계서 & AI Skill 파일 다운로드
+              </h4>
+              <p className="text-xs text-slate-400">
+                개발된 당직 콜 분기 룰, Neon DB 동기화 아키텍처 및 Antigravity 에이전트 Skill 마크다운(.md) 파일을 직접 다운로드할 수 있습니다.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <a
+                href="/downloads/SYSTEM_ARCHITECTURE.md"
+                download="SYSTEM_ARCHITECTURE.md"
+                className="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-cyan-500/30 hover:border-cyan-400 flex items-center justify-between transition group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">SYSTEM_ARCHITECTURE.md</div>
+                    <div className="text-xs text-slate-400">시스템 전체 개발 분석 및 운영 가이드 문서</div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-cyan-400 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                  다운로드
+                </span>
+              </a>
+
+              <a
+                href="/downloads/SKILL.md"
+                download="hospital-call-system-SKILL.md"
+                className="p-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-purple-500/30 hover:border-purple-400 flex items-center justify-between transition group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">SKILL.md (Antigravity Skill)</div>
+                    <div className="text-xs text-slate-400">AI 에이전트 전용 당직 시스템 스킬 명세서</div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-purple-400 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  다운로드
+                </span>
+              </a>
+            </div>
           </div>
         </div>
       )}
