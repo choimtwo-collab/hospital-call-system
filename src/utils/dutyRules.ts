@@ -133,12 +133,12 @@ export function evaluateDutyRules(
   const timeDecimal = hour + minute / 60;
   
   // ─── 당직 기준 일자(effectiveDutyDate) 계산 ───
-  // 00:00 ~ 08:00 (timeMinutes < 481, 즉 07:59까지)는 전날 17:01(또는 20:01)에 시작된 당직의 익일 08:00까지의 연장 근무 구간입니다.
-  // 따라서 당직표 조회 및 당직자 매칭은 전날(selectedDate - 1일)의 당직표를 기준으로 조회합니다.
+  // 00:00 ~ 08:00 직전(timeMinutes < 480, 즉 07:59까지)는 전날 시작된 당직의 연장 근무 구간입니다.
+  // 08:00 정각(timeMinutes >= 480)부터는 당일(selectedDate)의 새로운 주간/당직 근무가 시작됩니다.
   let effectiveDutyDate = selectedDate;
   let isOvernightFromYesterday = false;
 
-  if (timeMinutes < 481) {
+  if (timeMinutes < 480) {
     const prevDateObj = new Date(selectedDate);
     prevDateObj.setDate(prevDateObj.getDate() - 1);
     const y = prevDateObj.getFullYear();
@@ -152,18 +152,18 @@ export function evaluateDutyRules(
   const effectiveHolidayInfo = isOvernightFromYesterday ? checkKoreanHoliday(effectiveDutyDate) : holidayInfo;
   const isEffectiveWeekendOrHoliday = effectiveHolidayInfo.isHolidayOrWeekend;
 
-  // 평일 주간: 평일 08:01 ~ 17:00 (481분 ~ 1020분)
-  // 평일 당직: 평일 17:01 ~ 익일 08:00 (1021분 이상 또는 익일 480분 이하)
-  // 주말/공휴일 주간당직: 08:01 ~ 20:00 (481분 ~ 1200분)
-  // 주말/공휴일 야간당직: 20:01 ~ 익일 08:00 (1201분 이상 또는 익일 480분 이하)
-  const isWeekdayDaytime = !isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1020);
+  // 평일 주간: 평일 08:00 ~ 17:00 (480분 ~ 1020분)
+  // 평일 당직: 평일 17:01 ~ 익일 07:59 (1021분 이상 또는 익일 479분 이하)
+  // 주말/공휴일 주간당직: 08:00 ~ 20:00 (480분 ~ 1200분)
+  // 주말/공휴일 야간당직: 20:01 ~ 익일 07:59 (1201분 이상 또는 익일 479분 이하)
+  const isWeekdayDaytime = !isWeekendOrHoliday && (timeMinutes >= 480 && timeMinutes <= 1020);
   const isWeekdayDuty = isOvernightFromYesterday 
     ? !isEffectiveWeekendOrHoliday 
     : (!isWeekendOrHoliday && timeMinutes > 1020);
-  const isWeekendDayDuty = isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1200);
+  const isWeekendDayDuty = isWeekendOrHoliday && (timeMinutes >= 480 && timeMinutes <= 1200);
   const isWeekendNightDuty = isOvernightFromYesterday 
     ? isEffectiveWeekendOrHoliday 
-    : (isWeekendOrHoliday && (timeMinutes > 1200 || timeMinutes < 481));
+    : (isWeekendOrHoliday && (timeMinutes > 1200 || timeMinutes < 480));
   const isDutyHours = isOvernightFromYesterday || isWeekendOrHoliday || (timeMinutes > 1020);
 
   // 기존 정규시간 호환 (08:01 ~ 17:00)
