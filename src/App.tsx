@@ -62,6 +62,20 @@ const DB_KEYS = {
   APP_USERS: 'app_users'
 };
 
+// 구버전 dutyRoles 목록이 남아있을 경우 주간/당직 분리 목록으로 부드럽게 마이그레이션
+function normalizeDutyRoles(roles: any): string[] {
+  if (!Array.isArray(roles) || roles.length === 0) return initialDutyRoles;
+  if (!roles.includes('내과 1 (주간)') && (roles.includes('내과 1') || roles.includes('내과1'))) {
+    const updated = roles.flatMap(r => {
+      if (r === '내과 1' || r === '내과1') return ['내과 1 (주간)', '내과당직 1'];
+      if (r === '내과 2' || r === '내과2') return ['내과 2 (주간)', '내과당직 2'];
+      return [r];
+    });
+    return Array.from(new Set(updated));
+  }
+  return roles;
+}
+
 export default function App() {
   const [view, setView] = useState<'user' | 'admin'>('user');
   const {
@@ -144,7 +158,12 @@ export default function App() {
 
   const [dutyRoles, setDutyRoles] = useState<string[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.DUTY_ROLES);
-    return saved ? JSON.parse(saved) : initialDutyRoles;
+    if (saved) {
+      try {
+        return normalizeDutyRoles(JSON.parse(saved));
+      } catch (e) {}
+    }
+    return initialDutyRoles;
   });
 
   const [dutyPhones, setDutyPhones] = useState<DutyPhoneItem[]>(() => {
@@ -204,7 +223,7 @@ export default function App() {
         if (settings[DB_KEYS.INTERNS]) setInterns(settings[DB_KEYS.INTERNS]);
         if (settings[DB_KEYS.PATHOLOGISTS]) setPathologistSchedules(settings[DB_KEYS.PATHOLOGISTS]);
         if (settings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(settings[DB_KEYS.SHEETS_CONFIG]);
-        if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
+        if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(normalizeDutyRoles(settings[DB_KEYS.DUTY_ROLES]));
         if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
         if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
         if (settings[DB_KEYS.HOTLINES]) applyRemoteHotlines(settings[DB_KEYS.HOTLINES]);
@@ -241,7 +260,7 @@ export default function App() {
       if (remoteSettings[DB_KEYS.INTERNS]) setInterns(remoteSettings[DB_KEYS.INTERNS]);
       if (remoteSettings[DB_KEYS.PATHOLOGISTS]) setPathologistSchedules(remoteSettings[DB_KEYS.PATHOLOGISTS]);
       if (remoteSettings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(remoteSettings[DB_KEYS.SHEETS_CONFIG]);
-      if (remoteSettings[DB_KEYS.DUTY_ROLES]) setDutyRoles(remoteSettings[DB_KEYS.DUTY_ROLES]);
+      if (remoteSettings[DB_KEYS.DUTY_ROLES]) setDutyRoles(normalizeDutyRoles(remoteSettings[DB_KEYS.DUTY_ROLES]));
       if (remoteSettings[DB_KEYS.DUTY_PHONES]) setDutyPhones(remoteSettings[DB_KEYS.DUTY_PHONES]);
       if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]);
       if (remoteSettings[DB_KEYS.HOTLINES]) applyRemoteHotlines(remoteSettings[DB_KEYS.HOTLINES]);

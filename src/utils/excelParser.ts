@@ -118,12 +118,33 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           }
           // 2. 내과 (Internal Medicine)
           else if (h.includes('내과') || h.includes('im')) {
+            const isDuty = h.includes('당직') || h.includes('night') || h.includes('duty');
+            const isDay = h.includes('주간') || h.includes('day');
+
             if (h.includes('1') || h.includes('인턴1')) {
-              targetKeys.push(ROLES.IM_1, '내과 1', '내과1');
-              detectedColumnNames.push('내과 1');
+              if (isDuty) {
+                targetKeys.push('내과당직 1', '내과당직1');
+                detectedColumnNames.push('내과당직 1');
+              } else if (isDay) {
+                targetKeys.push('내과 1 (주간)', '내과 1(주간)', '내과1(주간)', ROLES.IM_1);
+                detectedColumnNames.push('내과 1 (주간)');
+              } else {
+                // 주간/당직 명시가 없는 일반 "내과 1"인 경우 둘 다 매핑하여 호환 유지
+                targetKeys.push('내과 1 (주간)', '내과당직 1', ROLES.IM_1, '내과 1', '내과1');
+                detectedColumnNames.push('내과 1 (주간)');
+              }
             } else if (h.includes('2') || h.includes('인턴2')) {
-              targetKeys.push(ROLES.IM_2, '내과 2', '내과2');
-              detectedColumnNames.push('내과 2');
+              if (isDuty) {
+                targetKeys.push('내과당직 2', '내과당직2');
+                detectedColumnNames.push('내과당직 2');
+              } else if (isDay) {
+                targetKeys.push('내과 2 (주간)', '내과 2(주간)', '내과2(주간)', ROLES.IM_2);
+                detectedColumnNames.push('내과 2 (주간)');
+              } else {
+                // 주간/당직 명시가 없는 일반 "내과 2"인 경우 둘 다 매핑하여 호환 유지
+                targetKeys.push('내과 2 (주간)', '내과당직 2', ROLES.IM_2, '내과 2', '내과2');
+                detectedColumnNames.push('내과 2 (주간)');
+              }
             }
           }
           // 3. 당직인턴1, 2, 3 (비내과 당직인턴)
@@ -183,16 +204,18 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           });
         });
 
-        // 만약 열 매핑이 전혀 잡히지 않았다면 기본 순서 대체 (0: 날짜, 1: 내과1, 2: 내과2, 3: 비내과1, 4: 비내과2, 5: 비내과3)
+        // 만약 열 매핑이 전혀 잡히지 않았다면 기본 순서 대체
         if (columnMappings.length === 0) {
           columnMappings.push(
-            { colIndex: 1, headerName: '내과 1', targetKeys: [ROLES.IM_1, '내과 1', '내과1'] },
-            { colIndex: 2, headerName: '내과 2', targetKeys: [ROLES.IM_2, '내과 2', '내과2'] },
-            { colIndex: 3, headerName: '비내과 1', targetKeys: [ROLES.NON_IM_1, '비내과 1', '비내과1'] },
-            { colIndex: 4, headerName: '비내과 2', targetKeys: [ROLES.NON_IM_2, '비내과 2', '비내과2'] },
-            { colIndex: 5, headerName: '비내과 3', targetKeys: [ROLES.NON_IM_3, '비내과 3', '비내과3'] }
+            { colIndex: 1, headerName: '내과 1 (주간)', targetKeys: ['내과 1 (주간)', ROLES.IM_1, '내과 1'] },
+            { colIndex: 2, headerName: '내과 2 (주간)', targetKeys: ['내과 2 (주간)', ROLES.IM_2, '내과 2'] },
+            { colIndex: 3, headerName: '내과당직 1', targetKeys: ['내과당직 1', '내과당직1'] },
+            { colIndex: 4, headerName: '내과당직 2', targetKeys: ['내과당직 2', '내과당직2'] },
+            { colIndex: 5, headerName: '비내과 1', targetKeys: [ROLES.NON_IM_1, '비내과 1', '비내과1'] },
+            { colIndex: 6, headerName: '비내과 2', targetKeys: [ROLES.NON_IM_2, '비내과 2', '비내과2'] },
+            { colIndex: 7, headerName: '비내과 3', targetKeys: [ROLES.NON_IM_3, '비내과 3', '비내과3'] }
           );
-          detectedColumnNames.push('내과 1', '내과 2', '비내과 1', '비내과 2', '비내과 3');
+          detectedColumnNames.push('내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3');
         }
 
         const newSchedules: DateScheduleMap = {};
@@ -266,7 +289,7 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           schedules: newSchedules,
           rowCount: parsedDates.length,
           dates: parsedDates,
-          columns: uniqueCols.length > 0 ? uniqueCols : ['내과 1', '내과 2', '비내과 1', '비내과 2', '비내과 3'],
+          columns: uniqueCols.length > 0 ? uniqueCols : ['내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3'],
           message: parsedDates.length > 0 
             ? `성공: 총 ${parsedDates.length}일치의 당직표 데이터가 정상 파싱되었습니다.` 
             : '유효한 날짜 데이터를 찾지 못했습니다. 엑셀의 날짜 열 형식을 확인해주세요.'
@@ -292,25 +315,27 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
  */
 export function generateSampleExcelBlob(): Blob {
   const sampleData = [
-    ['날짜', '내과1 (인턴1)', '내과2 (인턴2)', '비내과1 (당직인턴1)', '비내과2 (당직인턴2)', '비내과3 (당직인턴3)', '연차'],
-    ['2026-09-01', '이준재', '정소영', '신정민', '이창윤', '배규리', ''],
-    ['2026-09-02', '정소영', '박신희', '배규리', '최남석', '이태겸', '신유경'],
-    ['2026-09-03', '전지연', '이준재', '이창윤', '전하윤', '천지원', ''],
-    ['2026-09-04', '정소영', '박수현', '신유경', '권민재', '이태겸', ''],
-    ['2026-09-05', '박신희', '이상엽', '유성윤', '신정민', '최남석', ''],
-    ['2026-09-06', '전지연', '박수현', '전하윤', '이태겸', '권민재', '이상엽']
+    ['날짜', '내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3', '연차'],
+    ['2026-09-01', '이준재', '정소영', '이준재', '정소영', '신정민', '이창윤', '배규리', ''],
+    ['2026-09-02', '정소영', '박신희', '박신희', '전지연', '배규리', '최남석', '이태겸', '신유경'],
+    ['2026-09-03', '전지연', '이준재', '박수현', '신정민', '이창윤', '전하윤', '천지원', ''],
+    ['2026-09-04', '정소영', '박수현', '이준재', '정소영', '신유경', '권민재', '이태겸', ''],
+    ['2026-09-05', '', '', '박신희', '전지연', '유성윤', '신정민', '최남석', ''],
+    ['2026-09-06', '', '', '신정민', '박수현', '전하윤', '이태겸', '권민재', '이상엽']
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(sampleData);
   // 열 너비 자동 설정
   ws['!cols'] = [
     { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 },
     { wch: 18 },
     { wch: 18 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 16 }
+    { wch: 18 },
+    { wch: 14 }
   ];
 
   const wb = XLSX.utils.book_new();

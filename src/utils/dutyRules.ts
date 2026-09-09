@@ -26,16 +26,20 @@ export function getScheduleDoctor(schedule: Record<string, string> | undefined, 
   // 2. 표준 역할 키 및 별칭 키 탐색
   if (isIm) {
     if (cleanKey.includes('당직1') || cleanKey.includes('당직인턴1')) {
-      const v = schedule[ROLES.IM_DUTY_1] ?? schedule['내과인턴당직1'] ?? schedule['내과인턴당직 1'] ?? schedule['내과당직 1'] ?? schedule['내과당직1'] ?? schedule[ROLES.IM_1] ?? schedule['내과1'] ?? schedule['내과 1'];
+      const v = schedule['내과당직 1'] ?? schedule['내과당직1'] ?? schedule[ROLES.IM_DUTY_1] ?? 
+        schedule['내과인턴당직1'] ?? schedule['내과인턴당직 1'] ?? schedule['당직 1'] ?? schedule['당직1'] ??
+        schedule['내과 1 (주간)'] ?? schedule[ROLES.IM_1] ?? schedule['내과 1'] ?? schedule['내과1'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     } else if (cleanKey.includes('당직2') || cleanKey.includes('당직인턴2')) {
-      const v = schedule[ROLES.IM_DUTY_2] ?? schedule['내과인턴당직2'] ?? schedule['내과인턴당직 2'] ?? schedule['내과당직 2'] ?? schedule['내과당직2'] ?? schedule[ROLES.IM_2] ?? schedule['내과2'] ?? schedule['내과 2'];
+      const v = schedule['내과당직 2'] ?? schedule['내과당직2'] ?? schedule[ROLES.IM_DUTY_2] ?? 
+        schedule['내과인턴당직2'] ?? schedule['내과인턴당직 2'] ?? schedule['당직 2'] ?? schedule['당직2'] ??
+        schedule['내과 2 (주간)'] ?? schedule[ROLES.IM_2] ?? schedule['내과 2'] ?? schedule['내과2'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
-    } else if (cleanKey.includes('1') || cleanKey.includes('인턴1')) {
-      const v = schedule[ROLES.IM_1] ?? schedule['내과1'] ?? schedule['내과 1'] ?? schedule['내과인턴당직1'];
+    } else if (cleanKey.includes('1') || cleanKey.includes('인턴1') || cleanKey.includes('주간1')) {
+      const v = schedule['내과 1 (주간)'] ?? schedule[ROLES.IM_1] ?? schedule['내과 1'] ?? schedule['내과1'] ?? schedule['내과인턴당직1'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
-    } else if (cleanKey.includes('2') || cleanKey.includes('인턴2')) {
-      const v = schedule[ROLES.IM_2] ?? schedule['내과2'] ?? schedule['내과 2'] ?? schedule['내과인턴당직2'];
+    } else if (cleanKey.includes('2') || cleanKey.includes('인턴2') || cleanKey.includes('주간2')) {
+      const v = schedule['내과 2 (주간)'] ?? schedule[ROLES.IM_2] ?? schedule['내과 2'] ?? schedule['내과2'] ?? schedule['내과인턴당직2'];
       if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
     }
   }

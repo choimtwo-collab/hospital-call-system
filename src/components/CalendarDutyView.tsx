@@ -237,7 +237,7 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
                 당직표 구분(역할) 셋팅 및 추가·삭제
               </h4>
               <p className="text-xs text-slate-400 mt-0.5">
-                당직 달력의 각 주차 행에 표시될 구분 항목을 관리자가 자유롭게 구성합니다. (예: 내과 1, 내과 2, 비내과 1, 연차 등)
+                당직 달력의 각 주차 행에 표시될 구분 항목을 관리자가 자유롭게 구성합니다. (예: 내과 1 (주간), 내과 2 (주간), 내과당직 1, 내과당직 2, 비내과 1, 연차 등)
               </p>
             </div>
             <button
@@ -409,14 +409,19 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
                   >
                     {/* Role Header (구분 이름) */}
                     <td className="p-2 text-center font-bold text-slate-300 border-r border-slate-800 bg-slate-900/70">
-                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                        role.includes('내과')
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                          : (role.includes('비내과')
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700')
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
+                        role.includes('주간')
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10'
+                          : (role.includes('당직') && role.includes('내과')
+                            ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
+                            : (role.includes('비내과')
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700'))
                       }`}>
-                        {role}
+                        {role.includes('주간') && <span className="text-[10px]">☀️</span>}
+                        {role.includes('당직') && role.includes('내과') && <span className="text-[10px]">🌙</span>}
+                        {role.includes('비내과') && <span className="text-[10px]">🛡️</span>}
+                        <span>{role}</span>
                       </span>
                     </td>
 
@@ -434,21 +439,29 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
                       }
 
                       const dateKey = day.dateStr;
-                      const currentValue = schedules[dateKey]?.[role] || getScheduleDoctor(schedules[dateKey], role) || '';
+                      const currentValue = schedules[dateKey]?.[role] !== undefined 
+                        ? schedules[dateKey][role] 
+                        : (getScheduleDoctor(schedules[dateKey], role) || '');
+                      const isWeekendOrHoliday = day.isSaturday || day.isSunday || day.isHoliday;
+                      const isDayRole = role.includes('주간');
 
                       return (
                         <td
                           key={`cell-${dateKey}-${role}`}
                           className={`p-1 border-r border-slate-800/60 last:border-r-0 ${
                             day.isSunday ? 'bg-rose-950/10' : (day.isSaturday ? 'bg-sky-950/10' : '')
-                          }`}
+                          } ${isDayRole && isWeekendOrHoliday ? 'opacity-80' : ''}`}
                         >
                           <input
                             type="text"
                             value={currentValue}
                             onChange={(e) => onScheduleChange(dateKey, role, e.target.value)}
-                            placeholder="이름 입력"
-                            className="w-full bg-slate-900/80 hover:bg-slate-850 focus:bg-slate-900 border border-slate-800 focus:border-cyan-400 rounded-lg px-2 py-1.5 text-center text-xs font-bold text-white placeholder-slate-600 transition focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                            placeholder={isDayRole && isWeekendOrHoliday ? '(주말OFF)' : '이름 입력'}
+                            className={`w-full border rounded-lg px-2 py-1.5 text-center text-xs font-bold transition focus:outline-none focus:ring-1 ${
+                              isDayRole && isWeekendOrHoliday && !currentValue
+                                ? 'bg-slate-950/40 border-slate-850 text-slate-500 placeholder-slate-600 focus:border-amber-400 focus:ring-amber-400'
+                                : 'bg-slate-900/80 hover:bg-slate-850 focus:bg-slate-900 border-slate-800 focus:border-cyan-400 text-white placeholder-slate-600 focus:ring-cyan-400'
+                            }`}
                           />
                         </td>
                       );
