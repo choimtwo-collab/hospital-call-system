@@ -57,6 +57,18 @@ export function getScheduleDoctor(schedule: Record<string, string> | undefined, 
     }
   }
 
+  // 심장내과 (CV) 매칭
+  if (cleanKey.includes('심장') || cleanKey.includes('cv') || cleanKey.includes('순환기')) {
+    const v = schedule['심장내과'] ?? schedule['cv 분과'] ?? schedule['cv분과'] ?? schedule['cv'] ?? schedule['순환기내과'];
+    if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+  }
+
+  // 호흡기내과 (IMR) 매칭
+  if (cleanKey.includes('호흡기') || cleanKey.includes('imr') || cleanKey.includes('pulmo')) {
+    const v = schedule['호흡기내과'] ?? schedule['imr 분과'] ?? schedule['imr분과'] ?? schedule['imr'];
+    if (v !== undefined && v !== null && v.trim() !== '') return v.trim();
+  }
+
   // 3. Fallback: 루프를 돌며 cleanKey 매칭
   for (const [k, v] of Object.entries(schedule)) {
     if (!v || !v.trim()) continue;

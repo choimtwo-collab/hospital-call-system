@@ -62,18 +62,40 @@ const DB_KEYS = {
   APP_USERS: 'app_users'
 };
 
-// 구버전 dutyRoles 목록이 남아있을 경우 주간/당직 분리 목록으로 부드럽게 마이그레이션
+// 구버전 dutyRoles 목록이 남아있을 경우 주간/당직 분리 및 심장내과/호흡기내과 추가 목록으로 부드럽게 마이그레이션
 function normalizeDutyRoles(roles: any): string[] {
   if (!Array.isArray(roles) || roles.length === 0) return initialDutyRoles;
-  if (!roles.includes('내과 1 (주간)') && (roles.includes('내과 1') || roles.includes('내과1'))) {
-    const updated = roles.flatMap(r => {
+
+  let current = [...roles];
+
+  // 1. 구버전 내과 1, 내과 2 분리 마이그레이션
+  if (!current.includes('내과 1 (주간)') && (current.includes('내과 1') || current.includes('내과1'))) {
+    current = current.flatMap(r => {
       if (r === '내과 1' || r === '내과1') return ['내과 1 (주간)', '내과당직 1'];
       if (r === '내과 2' || r === '내과2') return ['내과 2 (주간)', '내과당직 2'];
       return [r];
     });
-    return Array.from(new Set(updated));
   }
-  return roles;
+
+  // 2. 심장내과, 호흡기내과가 없으면 '내과 2 (주간)' 바로 뒤에 순서대로 삽입
+  const hasCV = current.some(r => r.includes('심장내과') || r.includes('cv'));
+  const hasIMR = current.some(r => r.includes('호흡기내과') || r.includes('imr'));
+
+  if (!hasCV || !hasIMR) {
+    const nextList: string[] = [];
+    for (const r of current) {
+      nextList.push(r);
+      if (r === '내과 2 (주간)' || r === '내과 2' || r === '내과2') {
+        if (!hasCV && !nextList.includes('심장내과')) nextList.push('심장내과');
+        if (!hasIMR && !nextList.includes('호흡기내과')) nextList.push('호흡기내과');
+      }
+    }
+    if (!nextList.includes('심장내과')) nextList.push('심장내과');
+    if (!nextList.includes('호흡기내과')) nextList.push('호흡기내과');
+    current = nextList;
+  }
+
+  return Array.from(new Set(current));
 }
 
 export default function App() {

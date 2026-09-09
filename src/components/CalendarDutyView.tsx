@@ -410,15 +410,21 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
                     {/* Role Header (구분 이름) */}
                     <td className="p-2 text-center font-bold text-slate-300 border-r border-slate-800 bg-slate-900/70">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                        role.includes('주간')
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10'
-                          : (role.includes('당직') && role.includes('내과')
-                            ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
-                            : (role.includes('비내과')
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-300 border border-slate-700'))
+                        role.includes('심장') || role.includes('cv')
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm shadow-rose-500/10'
+                          : (role.includes('호흡기') || role.includes('imr')
+                            ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30 shadow-sm shadow-teal-500/10'
+                            : (role.includes('주간')
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10'
+                              : (role.includes('당직') && role.includes('내과')
+                                ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
+                                : (role.includes('비내과')
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-slate-800 text-slate-300 border border-slate-700'))))
                       }`}>
-                        {role.includes('주간') && <span className="text-[10px]">☀️</span>}
+                        {(role.includes('심장') || role.includes('cv')) && <span className="text-[10px]">❤️</span>}
+                        {(role.includes('호흡기') || role.includes('imr')) && <span className="text-[10px]">🫁</span>}
+                        {!role.includes('심장') && !role.includes('cv') && !role.includes('호흡기') && !role.includes('imr') && role.includes('주간') && <span className="text-[10px]">☀️</span>}
                         {role.includes('당직') && role.includes('내과') && <span className="text-[10px]">🌙</span>}
                         {role.includes('비내과') && <span className="text-[10px]">🛡️</span>}
                         <span>{role}</span>
@@ -443,7 +449,7 @@ export const CalendarDutyView: React.FC<CalendarDutyViewProps> = ({
                         ? schedules[dateKey][role] 
                         : (getScheduleDoctor(schedules[dateKey], role) || '');
                       const isWeekendOrHoliday = day.isSaturday || day.isSunday || day.isHoliday;
-                      const isDayRole = role.includes('주간');
+                      const isDayRole = role.includes('주간') || role.includes('심장') || role.includes('호흡기') || role.includes('cv') || role.includes('imr');
 
                       return (
                         <td

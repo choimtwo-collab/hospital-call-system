@@ -116,7 +116,17 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
               detectedColumnNames.push('비내과 3');
             }
           }
-          // 2. 내과 (Internal Medicine)
+          // 2. 심장내과 (Cardiology / CV 분과)
+          else if (h.includes('심장') || h.includes('cv') || h.includes('순환기')) {
+            targetKeys.push('심장내과', 'cv 분과', 'cv분과', 'cv', '순환기내과');
+            detectedColumnNames.push('심장내과');
+          }
+          // 3. 호흡기내과 (Pulmonology / IMR 분과)
+          else if (h.includes('호흡기') || h.includes('imr') || h.includes('pulmo')) {
+            targetKeys.push('호흡기내과', 'imr 분과', 'imr분과', 'imr');
+            detectedColumnNames.push('호흡기내과');
+          }
+          // 4. 내과 (Internal Medicine)
           else if (h.includes('내과') || h.includes('im')) {
             const isDuty = h.includes('당직') || h.includes('night') || h.includes('duty');
             const isDay = h.includes('주간') || h.includes('day');
@@ -209,13 +219,15 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           columnMappings.push(
             { colIndex: 1, headerName: '내과 1 (주간)', targetKeys: ['내과 1 (주간)', ROLES.IM_1, '내과 1'] },
             { colIndex: 2, headerName: '내과 2 (주간)', targetKeys: ['내과 2 (주간)', ROLES.IM_2, '내과 2'] },
-            { colIndex: 3, headerName: '내과당직 1', targetKeys: ['내과당직 1', '내과당직1'] },
-            { colIndex: 4, headerName: '내과당직 2', targetKeys: ['내과당직 2', '내과당직2'] },
-            { colIndex: 5, headerName: '비내과 1', targetKeys: [ROLES.NON_IM_1, '비내과 1', '비내과1'] },
-            { colIndex: 6, headerName: '비내과 2', targetKeys: [ROLES.NON_IM_2, '비내과 2', '비내과2'] },
-            { colIndex: 7, headerName: '비내과 3', targetKeys: [ROLES.NON_IM_3, '비내과 3', '비내과3'] }
+            { colIndex: 3, headerName: '심장내과', targetKeys: ['심장내과', 'cv 분과', 'cv분과', 'cv', '순환기내과'] },
+            { colIndex: 4, headerName: '호흡기내과', targetKeys: ['호흡기내과', 'imr 분과', 'imr분과', 'imr'] },
+            { colIndex: 5, headerName: '내과당직 1', targetKeys: ['내과당직 1', '내과당직1'] },
+            { colIndex: 6, headerName: '내과당직 2', targetKeys: ['내과당직 2', '내과당직2'] },
+            { colIndex: 7, headerName: '비내과 1', targetKeys: [ROLES.NON_IM_1, '비내과 1', '비내과1'] },
+            { colIndex: 8, headerName: '비내과 2', targetKeys: [ROLES.NON_IM_2, '비내과 2', '비내과2'] },
+            { colIndex: 9, headerName: '비내과 3', targetKeys: [ROLES.NON_IM_3, '비내과 3', '비내과3'] }
           );
-          detectedColumnNames.push('내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3');
+          detectedColumnNames.push('내과 1 (주간)', '내과 2 (주간)', '심장내과', '호흡기내과', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3');
         }
 
         const newSchedules: DateScheduleMap = {};
@@ -289,7 +301,7 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
           schedules: newSchedules,
           rowCount: parsedDates.length,
           dates: parsedDates,
-          columns: uniqueCols.length > 0 ? uniqueCols : ['내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3'],
+          columns: uniqueCols.length > 0 ? uniqueCols : ['내과 1 (주간)', '내과 2 (주간)', '심장내과', '호흡기내과', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3'],
           message: parsedDates.length > 0 
             ? `성공: 총 ${parsedDates.length}일치의 당직표 데이터가 정상 파싱되었습니다.` 
             : '유효한 날짜 데이터를 찾지 못했습니다. 엑셀의 날짜 열 형식을 확인해주세요.'
@@ -315,13 +327,13 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
  */
 export function generateSampleExcelBlob(): Blob {
   const sampleData = [
-    ['날짜', '내과 1 (주간)', '내과 2 (주간)', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3', '연차'],
-    ['2026-09-01', '이준재', '정소영', '이준재', '정소영', '신정민', '이창윤', '배규리', ''],
-    ['2026-09-02', '정소영', '박신희', '박신희', '전지연', '배규리', '최남석', '이태겸', '신유경'],
-    ['2026-09-03', '전지연', '이준재', '박수현', '신정민', '이창윤', '전하윤', '천지원', ''],
-    ['2026-09-04', '정소영', '박수현', '이준재', '정소영', '신유경', '권민재', '이태겸', ''],
-    ['2026-09-05', '', '', '박신희', '전지연', '유성윤', '신정민', '최남석', ''],
-    ['2026-09-06', '', '', '신정민', '박수현', '전하윤', '이태겸', '권민재', '이상엽']
+    ['날짜', '내과 1 (주간)', '내과 2 (주간)', '심장내과', '호흡기내과', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3', '연차'],
+    ['2026-09-01', '이준재', '', '', '', '', '이준재', '신유경', '전하윤', '권민재', ''],
+    ['2026-09-02', '정소영', '박신희', '신정민', '박수현', '정소영', '박신희', '배규리', '최남석', '이태겸', ''],
+    ['2026-09-03', '이준재', '전지연', '신정민', '박수현', '전지연', '이준재', '이창윤', '전하윤', '천지원', ''],
+    ['2026-09-04', '박신희', '정소영', '신정민', '박수현', '정소영', '박수현', '신유경', '권민재', '이태겸', ''],
+    ['2026-09-05', '', '', '', '', '이준재', '신정민', '최남석', '이상엽', '이창윤', ''],
+    ['2026-09-06', '', '', '', '', '전지연', '박수현', '전하윤', '배규리', '천지원', '']
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(sampleData);
@@ -330,6 +342,8 @@ export function generateSampleExcelBlob(): Blob {
     { wch: 14 },
     { wch: 16 },
     { wch: 16 },
+    { wch: 14 },
+    { wch: 14 },
     { wch: 16 },
     { wch: 16 },
     { wch: 18 },
