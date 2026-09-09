@@ -132,15 +132,39 @@ export function evaluateDutyRules(
   const timeMinutes = hour * 60 + minute;
   const timeDecimal = hour + minute / 60;
   
-  // 평일 주간: 08:01 ~ 17:00 (481분 ~ 1020분)
-  // 평일 당직: 17:01 ~ 익일 08:00 (1021분 이상 또는 480분 이하)
+  // ─── 당직 기준 일자(effectiveDutyDate) 계산 ───
+  // 00:00 ~ 08:00 (timeMinutes < 481, 즉 07:59까지)는 전날 17:01(또는 20:01)에 시작된 당직의 익일 08:00까지의 연장 근무 구간입니다.
+  // 따라서 당직표 조회 및 당직자 매칭은 전날(selectedDate - 1일)의 당직표를 기준으로 조회합니다.
+  let effectiveDutyDate = selectedDate;
+  let isOvernightFromYesterday = false;
+
+  if (timeMinutes < 481) {
+    const prevDateObj = new Date(selectedDate);
+    prevDateObj.setDate(prevDateObj.getDate() - 1);
+    const y = prevDateObj.getFullYear();
+    const m = String(prevDateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(prevDateObj.getDate()).padStart(2, '0');
+    effectiveDutyDate = `${y}-${m}-${d}`;
+    isOvernightFromYesterday = true;
+  }
+
+  // 전일 당직인 경우 전일의 평일/주말 여부를 기준으로 당직 형태를 판단
+  const effectiveHolidayInfo = isOvernightFromYesterday ? checkKoreanHoliday(effectiveDutyDate) : holidayInfo;
+  const isEffectiveWeekendOrHoliday = effectiveHolidayInfo.isHolidayOrWeekend;
+
+  // 평일 주간: 평일 08:01 ~ 17:00 (481분 ~ 1020분)
+  // 평일 당직: 평일 17:01 ~ 익일 08:00 (1021분 이상 또는 익일 480분 이하)
   // 주말/공휴일 주간당직: 08:01 ~ 20:00 (481분 ~ 1200분)
-  // 주말/공휴일 야간당직: 20:01 ~ 익일 08:00 (1201분 이상 또는 480분 이하)
+  // 주말/공휴일 야간당직: 20:01 ~ 익일 08:00 (1201분 이상 또는 익일 480분 이하)
   const isWeekdayDaytime = !isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1020);
-  const isWeekdayDuty = !isWeekendOrHoliday && (timeMinutes > 1020 || timeMinutes < 481);
+  const isWeekdayDuty = isOvernightFromYesterday 
+    ? !isEffectiveWeekendOrHoliday 
+    : (!isWeekendOrHoliday && timeMinutes > 1020);
   const isWeekendDayDuty = isWeekendOrHoliday && (timeMinutes >= 481 && timeMinutes <= 1200);
-  const isWeekendNightDuty = isWeekendOrHoliday && (timeMinutes > 1200 || timeMinutes < 481);
-  const isDutyHours = isWeekendOrHoliday || isWeekdayDuty;
+  const isWeekendNightDuty = isOvernightFromYesterday 
+    ? isEffectiveWeekendOrHoliday 
+    : (isWeekendOrHoliday && (timeMinutes > 1200 || timeMinutes < 481));
+  const isDutyHours = isOvernightFromYesterday || isWeekendOrHoliday || (timeMinutes > 1020);
 
   // 기존 정규시간 호환 (08:01 ~ 17:00)
   const isRegularHours = isWeekdayDaytime;
@@ -762,15 +786,22 @@ export function evaluateDutyRules(
         assignedRole = isNonIM2Ward ? ROLES.NON_IM_2 : (isNonIM1Ward ? ROLES.NON_IM_1 : ROLES.NON_IM_3);
       }
     }
-    const todaysSchedule = schedules[selectedDate];
-    if (todaysSchedule) {
-      const doctor = getScheduleDoctor(todaysSchedule, assignedRole);
+    // 당직 기준 날짜(effectiveDutyDate): 00:00 ~ 08:00 시간대는 전날 시작된 당직의 연장 근무이므로 effectiveDutyDate를 우선 조회
+    const targetScheduleDate = isDutyHours ? effectiveDutyDate : selectedDate;
+    const dutySchedule = schedules[targetScheduleDate] || schedules[selectedDate];
+    if (dutySchedule) {
+      const doctor = getScheduleDoctor(dutySchedule, assignedRole);
       if (doctor) {
         assignedPerson = doctor;
       }
     }
     if (assignedRole === ROLES.DUTY_NURSE) {
       assignedPerson = assignedRole;
+    }
+
+    if (isOvernightFromYesterday && isDutyHours) {
+      const shiftNote = `[전일(${effectiveDutyDate}) 당직자 익일 08:00까지 근무]`;
+      notes = notes ? `${shiftNote} ${notes}` : shiftNote;
     }
     if (assignedPerson === '미배정(근무표 확인)') {
       // 선택 날짜에 당직표 입력이 없는 경우, 등록된 첫 번째 당직표 일정이나 interns 연락망의 전공의로 자동 매칭
