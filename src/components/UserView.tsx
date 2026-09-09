@@ -3,7 +3,8 @@ import {
   Calendar, Clock, Phone, PhoneCall, ShieldAlert, CheckCircle2, 
   Building2, FileText, Zap, ChevronRight, AlertTriangle, ExternalLink, 
   RefreshCw, Bookmark, BookmarkCheck, Search, Copy, Check, MessageSquare,
-  Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen, Sliders
+  Sparkles, ShieldCheck, Layers, ListChecks, UserCheck, Stethoscope, BookOpen, Sliders,
+  Download
 } from 'lucide-react';
 import { 
   DEPARTMENTS, DepartmentType, WARD_OPTIONS, emergencyContacts as defaultEmergencyContacts 
@@ -16,6 +17,7 @@ import {
 import { GoogleSheetsConfig } from '../utils/googleSheetsSync';
 import { evaluateDutyRules, getLocalISOString } from '../utils/dutyRules';
 import { checkKoreanHoliday } from '../utils/koreanHolidays';
+import { makeUcapCall, DUMC_CALL_APK_URL } from '../utils/callHelper';
 
 interface UserViewProps {
   schedules: DateScheduleMap;
@@ -73,6 +75,16 @@ export const UserView: React.FC<UserViewProps> = ({
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [myDefaultWard, setMyDefaultWard] = useState<string | null>(savedMyWard);
+  const [callStatusMessage, setCallStatusMessage] = useState<string | null>(null);
+
+  // UCAP 번호 통화 처리 (DUMC Call 우선 연결, 미설치 시 일반 전화 자동 전환)
+  const handleUcapClick = (ucapNum?: string, fallbackPhoneNum?: string) => {
+    if (!ucapNum || ucapNum === '-') return;
+    makeUcapCall(ucapNum, fallbackPhoneNum, (msg) => {
+      setCallStatusMessage(msg);
+      setTimeout(() => setCallStatusMessage(null), 3500);
+    });
+  };
 
   // Filter tasks based on selected department and search query
   const availableTasks = useMemo(() => {
@@ -580,18 +592,25 @@ export const UserView: React.FC<UserViewProps> = ({
                 {/* One-Click Call Buttons */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   
-                  {/* UCAP Button */}
-                  <a
-                    href={`tel:${searchResult.dutyUcap || searchResult.contactInfo.ucap}`}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black shadow-xl shadow-cyan-500/25 transition group"
+                  {/* UCAP Button (DUMC Call 우선 연동, 미설치 시 일반 전화 자동 연결) */}
+                  <button
+                    type="button"
+                    onClick={() => handleUcapClick(
+                      searchResult.dutyUcap || searchResult.contactInfo.ucap,
+                      searchResult.dutyPhone || searchResult.contactInfo.phone
+                    )}
+                    className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black shadow-xl shadow-cyan-500/25 transition group text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-950/20 flex items-center justify-center">
                         <PhoneCall className="w-5 h-5 text-slate-950" />
                       </div>
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider font-extrabold text-slate-900">
-                          병동 내선 (UCAP 즉시 콜)
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-extrabold text-slate-900">
+                          <span>병동 내선 (UCAP 즉시 콜)</span>
+                          <span className="px-1.5 py-0.5 bg-slate-950/20 rounded text-[9px] font-black tracking-tight">
+                            DUMC Call 연동
+                          </span>
                         </div>
                         <div className="text-lg font-black tracking-tight">
                           {searchResult.dutyUcap || searchResult.contactInfo.ucap}
@@ -599,7 +618,7 @@ export const UserView: React.FC<UserViewProps> = ({
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition" />
-                  </a>
+                  </button>
 
                   {/* Phone Button */}
                   <a
@@ -622,6 +641,23 @@ export const UserView: React.FC<UserViewProps> = ({
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition text-slate-400" />
                   </a>
 
+                </div>
+
+                {/* DUMC Call App Hint & Direct Install */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 px-1 pt-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>DUMC Call 앱 미설치 시 일반 전화로 자동 전환됩니다.</span>
+                  </span>
+                  <a
+                    href={DUMC_CALL_APK_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyan-400 hover:text-cyan-300 underline font-semibold flex items-center gap-1 shrink-0"
+                  >
+                    <Download className="w-3 h-3" />
+                    DUMC Call(프리존) 앱 설치 APK
+                  </a>
                 </div>
 
                 {/* DUMC Talk ID & Copy helpers */}
@@ -742,29 +778,31 @@ export const UserView: React.FC<UserViewProps> = ({
                   {/* Backup Quick Dial Buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     {searchResult.backupContact1 && (
-                      <a
-                        href={`tel:${searchResult.backupContact1.ucap}`}
-                        className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition"
+                      <button
+                        type="button"
+                        onClick={() => handleUcapClick(searchResult.backupContact1!.ucap)}
+                        className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition text-left cursor-pointer"
                       >
                         <div>
                           <span className="text-[10px] text-amber-400 block font-bold">1순위 백업</span>
                           <span className="font-bold text-white">{searchResult.backupContact1.roleName}</span>
                         </div>
                         <span className="font-extrabold text-cyan-300">UCAP {searchResult.backupContact1.ucap}</span>
-                      </a>
+                      </button>
                     )}
 
                     {searchResult.backupContact2 && (
-                      <a
-                        href={`tel:${searchResult.backupContact2.ucap}`}
-                        className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition"
+                      <button
+                        type="button"
+                        onClick={() => handleUcapClick(searchResult.backupContact2!.ucap)}
+                        className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 flex items-center justify-between text-xs transition text-left cursor-pointer"
                       >
                         <div>
                           <span className="text-[10px] text-amber-400 block font-bold">2순위 백업</span>
                           <span className="font-bold text-white">{searchResult.backupContact2.roleName}</span>
                         </div>
                         <span className="font-extrabold text-cyan-300">UCAP {searchResult.backupContact2.ucap}</span>
-                      </a>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -781,10 +819,11 @@ export const UserView: React.FC<UserViewProps> = ({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
               {emergencyContacts.map(contact => (
-                <a
+                <button
                   key={contact.id}
-                  href={`tel:${contact.ucap}`}
-                  className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 transition flex flex-col justify-between group shadow-sm hover:shadow-cyan-500/10"
+                  type="button"
+                  onClick={() => handleUcapClick(contact.ucap, contact.phone !== '-' ? contact.phone : undefined)}
+                  className="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 transition flex flex-col justify-between group shadow-sm hover:shadow-cyan-500/10 text-left cursor-pointer"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-1 mb-1">
@@ -810,12 +849,20 @@ export const UserView: React.FC<UserViewProps> = ({
                       <span className="text-[10px] font-mono text-slate-400">{contact.phone}</span>
                     )}
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           </div>
 
         </div>
+
+        {/* Call Connection Floating Toast Notification */}
+        {callStatusMessage && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-cyan-500/60 shadow-2xl text-cyan-200 text-xs font-bold flex items-center gap-2.5 backdrop-blur-md animate-pulse">
+            <PhoneCall className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{callStatusMessage}</span>
+          </div>
+        )}
 
       </div>
     </div>
