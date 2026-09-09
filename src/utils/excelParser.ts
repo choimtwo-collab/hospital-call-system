@@ -324,32 +324,77 @@ export async function parseDutyExcel(file: File, activeDutyRoles: string[] = [])
 
 /**
  * 관리자가 바로 채워 넣을 수 있는 예제 당직표 엑셀 템플릿 파일(Blob)을 생성합니다.
+ * 관리자가 설정한 현재 구분(역할) 목록과 스케줄 데이터를 완벽하게 반영합니다.
  */
-export function generateSampleExcelBlob(): Blob {
-  const sampleData = [
-    ['날짜', '내과 1 (주간)', '내과 2 (주간)', '심장내과', '호흡기내과', '내과당직 1', '내과당직 2', '비내과 1', '비내과 2', '비내과 3', '연차'],
-    ['2026-09-01', '이준재', '', '', '', '', '이준재', '신유경', '전하윤', '권민재', ''],
-    ['2026-09-02', '정소영', '박신희', '신정민', '박수현', '정소영', '박신희', '배규리', '최남석', '이태겸', ''],
-    ['2026-09-03', '이준재', '전지연', '신정민', '박수현', '전지연', '이준재', '이창윤', '전하윤', '천지원', ''],
-    ['2026-09-04', '박신희', '정소영', '신정민', '박수현', '정소영', '박수현', '신유경', '권민재', '이태겸', ''],
-    ['2026-09-05', '', '', '', '', '이준재', '신정민', '최남석', '이상엽', '이창윤', ''],
-    ['2026-09-06', '', '', '', '', '전지연', '박수현', '전하윤', '배규리', '천지원', '']
+export function generateSampleExcelBlob(customRoles?: string[], existingSchedules?: DateScheduleMap): Blob {
+  const defaultRoles = [
+    '내과 1 (주간)',
+    '내과 2 (주간)',
+    '심장내과',
+    '호흡기내과',
+    '내과당직 1',
+    '내과당직 2',
+    '비내과 1',
+    '비내과 2',
+    '비내과 3',
+    '연차'
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(sampleData);
-  // 열 너비 자동 설정
+  const roles = (customRoles && customRoles.length > 0) ? customRoles : defaultRoles;
+  const headers = ['날짜', ...roles];
+
+  const rows: string[][] = [headers];
+
+  // 기존 스케줄 데이터가 있으면 날짜순 정렬하여 실제 데이터 채우기
+  if (existingSchedules && Object.keys(existingSchedules).length > 0) {
+    const sortedDates = Object.keys(existingSchedules).sort();
+    sortedDates.forEach(dStr => {
+      const daySched = existingSchedules[dStr] || {};
+      const row = [
+        dStr,
+        ...roles.map(r => daySched[r] ?? '')
+      ];
+      rows.push(row);
+    });
+  } else {
+    // 기본 7일치 현실적인 예제 데이터
+    const fallbackDays = [
+      { date: '2026-09-01', im1: '이준재', im2: '', cv: '', imr: '', duty1: '', duty2: '이준재', non1: '신유경', non2: '전하윤', non3: '권민재', off: '' },
+      { date: '2026-09-02', im1: '정소영', im2: '박신희', cv: '신정민', imr: '박수현', duty1: '정소영', duty2: '박신희', non1: '배규리', non2: '최남석', non3: '이태겸', off: '' },
+      { date: '2026-09-03', im1: '이준재', im2: '전지연', cv: '신정민', imr: '박수현', duty1: '전지연', duty2: '이준재', non1: '이창윤', non2: '전하윤', non3: '천지원', off: '' },
+      { date: '2026-09-04', im1: '박신희', im2: '정소영', cv: '신정민', imr: '박수현', duty1: '정소영', duty2: '박수현', non1: '신유경', non2: '권민재', non3: '이태겸', off: '' },
+      { date: '2026-09-05', im1: '', im2: '', cv: '', imr: '', duty1: '이준재', duty2: '신정민', non1: '최남석', non2: '이상엽', non3: '이창윤', off: '' },
+      { date: '2026-09-06', im1: '', im2: '', cv: '', imr: '', duty1: '전지연', duty2: '박수현', non1: '전하윤', non2: '배규리', non3: '천지원', off: '' },
+      { date: '2026-09-07', im1: '정소영', im2: '이준재', cv: '신정민', imr: '박신희', duty1: '정소영', duty2: '신정민', non1: '권민재', non2: '이상엽', non3: '최남석', off: '' }
+    ];
+
+    fallbackDays.forEach(fd => {
+      const row = [
+        fd.date,
+        ...roles.map(r => {
+          if (r.includes('주간') && r.includes('1')) return fd.im1;
+          if (r.includes('주간') && r.includes('2')) return fd.im2;
+          if (r.includes('심장') || r.includes('cv')) return fd.cv;
+          if (r.includes('호흡기') || r.includes('imr')) return fd.imr;
+          if (r.includes('당직') && r.includes('1')) return fd.duty1;
+          if (r.includes('당직') && r.includes('2')) return fd.duty2;
+          if (r.includes('비내과') && r.includes('1')) return fd.non1;
+          if (r.includes('비내과') && r.includes('2')) return fd.non2;
+          if (r.includes('비내과') && r.includes('3')) return fd.non3;
+          if (r.includes('연차')) return fd.off;
+          return '';
+        })
+      ];
+      rows.push(row);
+    });
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // 열 너비 자동 설정 (헤더 길이에 맞춰 여유 있게)
   ws['!cols'] = [
     { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 14 }
+    ...roles.map(r => ({ wch: Math.max(15, r.length * 2 + 2) }))
   ];
 
   const wb = XLSX.utils.book_new();

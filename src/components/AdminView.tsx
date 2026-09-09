@@ -232,14 +232,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   const handleDownloadSampleExcel = () => {
-    const blob = generateSampleExcelBlob();
+    const blob = generateSampleExcelBlob(dutyRoles, schedules);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = '병원_당직표_표준템플릿.xlsx';
     a.click();
     URL.revokeObjectURL(url);
-    showSaveSuccess('엑셀 표준 템플릿 파일이 다운로드되었습니다.');
+    showSaveSuccess('현재 당직표 구분이 반영된 표준 엑셀 템플릿이 다운로드되었습니다.');
   };
 
   // --- Schedule Handlers ---
