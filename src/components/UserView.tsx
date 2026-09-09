@@ -609,7 +609,7 @@ export const UserView: React.FC<UserViewProps> = ({
                         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-extrabold text-slate-900">
                           <span>병동 내선 (UCAP 즉시 콜)</span>
                           <span className="px-1.5 py-0.5 bg-slate-950/20 rounded text-[9px] font-black tracking-tight">
-                            DUMC Call 연동
+                            원클릭 전화 연결
                           </span>
                         </div>
                         <div className="text-lg font-black tracking-tight">
@@ -646,8 +646,8 @@ export const UserView: React.FC<UserViewProps> = ({
                 {/* DUMC Call App Hint & Direct Install */}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 px-1 pt-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                    <span>DUMC Call 앱 미설치 시 일반 전화로 자동 전환됩니다.</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span>클릭 시 스마트폰 전화로 바로 연결되며, 내선번호가 자동 복사됩니다.</span>
                   </span>
                   <a
                     href={DUMC_CALL_APK_URL}
