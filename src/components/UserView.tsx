@@ -83,8 +83,10 @@ export const UserView: React.FC<UserViewProps> = ({
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(ucapNum).catch(() => {});
     }
-    setCallStatusMessage(`프리존(DUMC Call) 앱으로 연결 중... (내선 ${ucapNum} 복사됨)`);
-    setTimeout(() => setCallStatusMessage(null), 3500);
+    setTimeout(() => {
+      setCallStatusMessage(`프리존(DUMC Call) 앱으로 연결 중... (내선 ${ucapNum} 복사됨)`);
+      setTimeout(() => setCallStatusMessage(null), 3000);
+    }, 50);
   };
 
   // Filter tasks based on selected department and search query
