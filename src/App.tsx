@@ -117,7 +117,24 @@ export default function App() {
   // Lazy initialize state from LocalStorage or default initial dataset
   const [schedules, setSchedules] = useState<DateScheduleMap>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SCHEDULES);
-    return saved ? JSON.parse(saved) : initialSchedules;
+    if (!saved) return initialSchedules;
+    try {
+      const parsed = JSON.parse(saved);
+      // 10월 당직표 데이터가 없거나 미완성인 경우 initialSchedules의 10월 당직표 자동 병합
+      const hasOctoberComplete = parsed['2026-10-01'] && (parsed['2026-10-01']['내과 1 (주간)'] === '전하윤' || parsed['2026-10-01']['내과 1'] === '전하윤');
+      if (!hasOctoberComplete) {
+        const octDays = Object.fromEntries(
+          Object.entries(initialSchedules).filter(([k]) => k.startsWith('2026-10'))
+        );
+        return {
+          ...parsed,
+          ...octDays
+        };
+      }
+      return parsed;
+    } catch {
+      return initialSchedules;
+    }
   });
 
   const [contacts, setContacts] = useState<ContactMap>(() => {
@@ -128,7 +145,10 @@ export default function App() {
       if (parsed[ROLES.PATHOLOGIST] && !parsed[ROLES.PATHOLOGIST].phone.includes('7795')) {
         parsed[ROLES.PATHOLOGIST] = initialContacts[ROLES.PATHOLOGIST];
       }
-      return parsed;
+      return {
+        ...initialContacts,
+        ...parsed
+      };
     } catch {
       return initialContacts;
     }
@@ -206,7 +226,16 @@ export default function App() {
 
   const [interns, setInterns] = useState<InternDoctor[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.INTERNS);
-    return saved ? JSON.parse(saved) : initialInterns;
+    if (!saved) return initialInterns;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialInterns;
+      const existingNames = new Set(parsed.map(i => i.name));
+      const missing = initialInterns.filter(i => !existingNames.has(i.name));
+      return [...parsed, ...missing];
+    } catch {
+      return initialInterns;
+    }
   });
 
   const [pathologistSchedules, setPathologistSchedules] = useState<PathologistSchedule[]>(() => {
