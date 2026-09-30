@@ -147,8 +147,20 @@ export default function App() {
       if (!Array.isArray(parsed) || parsed.length === 0) return initialCNPosts;
       return parsed.map((p: CNPost) => {
         const fresh = initialCNPosts.find(ip => ip.id === p.id || ip.name.replace(/\s+/g, '') === p.name.replace(/\s+/g, ''));
-        if (fresh && (p.ucap?.startsWith('530') || p.phone?.startsWith('010-1000-') || !p.phone)) {
-          return { ...p, phone: fresh.phone, ucap: fresh.ucap };
+        if (fresh) {
+          const isOldWards = (p.id === 'CN1' && !p.wards?.includes('42병동')) ||
+                             (p.id === 'CN2' && !p.wards?.includes('92병동')) ||
+                             (p.id === 'CN3' && !p.wards?.includes('72병동')) ||
+                             (p.id === 'CN4' && !p.wards?.includes('81병동')) ||
+                             (p.id === 'CN5' && !p.wards?.includes('71병동')) ||
+                             (p.id === 'CN6' && !p.wards?.includes('102병동'));
+          const isOldContact = p.ucap?.startsWith('530') || p.phone?.startsWith('010-1000-') || !p.phone;
+          return {
+            ...p,
+            phone: isOldContact ? fresh.phone : p.phone,
+            ucap: isOldContact ? fresh.ucap : p.ucap,
+            wards: isOldWards ? fresh.wards : p.wards
+          };
         }
         return p;
       });
@@ -240,30 +252,13 @@ export default function App() {
     try {
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return initialCNGroupSchedules;
-      const ucapMap: Record<string, string> = {
-        '53001': '5-4003',
-        '53002': '5-4004',
-        '53003': '5-4006',
-        '53004': '5-4011',
-        '53005': '5-4013',
-        '53006': '5-3498'
-      };
-      return parsed.map((grp: CNGroupSchedule) => {
-        if (!grp.schedule) return grp;
-        const newSchedule: any = {};
-        for (const [ts, dayMap] of Object.entries(grp.schedule)) {
-          newSchedule[ts] = {};
-          for (const [day, cell] of Object.entries(dayMap as any)) {
-            const c = cell as any;
-            if (c && c.ucap && ucapMap[c.ucap]) {
-              newSchedule[ts][day] = { ...c, ucap: ucapMap[c.ucap] };
-            } else {
-              newSchedule[ts][day] = c;
-            }
-          }
-        }
-        return { ...grp, schedule: newSchedule };
-      });
+      const hasOldGroup = parsed.some((g: any) => g.title?.includes('81, 82W') && g.id === 'cng-1') ||
+                          parsed.some((g: any) => g.title?.includes('한방, 71W') && g.id === 'cng-2') ||
+                          parsed.some((g: any) => g.title?.includes('SICU, 61, 62W') && g.id === 'cng-3');
+      if (hasOldGroup) {
+        return initialCNGroupSchedules;
+      }
+      return parsed;
     } catch {
       return initialCNGroupSchedules;
     }
