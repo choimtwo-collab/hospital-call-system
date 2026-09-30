@@ -3916,7 +3916,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           <input
                             type="text"
                             value={post.ucap}
-                            placeholder="예: 53001"
+                            placeholder="예: 5-4003"
                             onChange={e => handleUpdateCNPost(post.id, 'ucap', e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
                           />
@@ -3927,7 +3927,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           <input
                             type="text"
                             value={post.phone}
-                            placeholder="예: 010-1000-2001"
+                            placeholder="예: 010-8306-4170"
                             onChange={e => handleUpdateCNPost(post.id, 'phone', e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400"
                           />

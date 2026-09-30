@@ -141,7 +141,20 @@ export default function App() {
 
   const [cnPosts, setCnPosts] = useState<CNPost[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CN_POSTS);
-    return saved ? JSON.parse(saved) : initialCNPosts;
+    if (!saved) return initialCNPosts;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialCNPosts;
+      return parsed.map((p: CNPost) => {
+        const fresh = initialCNPosts.find(ip => ip.id === p.id || ip.name.replace(/\s+/g, '') === p.name.replace(/\s+/g, ''));
+        if (fresh && (p.ucap?.startsWith('530') || p.phone?.startsWith('010-1000-') || !p.phone)) {
+          return { ...p, phone: fresh.phone, ucap: fresh.ucap };
+        }
+        return p;
+      });
+    } catch {
+      return initialCNPosts;
+    }
   });
 
   const [weeklyCNSchedule, setWeeklyCNSchedule] = useState<WeeklyCNScheduleMap>(() => {
@@ -223,7 +236,37 @@ export default function App() {
 
   const [cnGroupSchedules, setCnGroupSchedules] = useState<CNGroupSchedule[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CN_GROUP_SCHEDULES);
-    return saved ? JSON.parse(saved) : initialCNGroupSchedules;
+    if (!saved) return initialCNGroupSchedules;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialCNGroupSchedules;
+      const ucapMap: Record<string, string> = {
+        '53001': '5-4003',
+        '53002': '5-4004',
+        '53003': '5-4006',
+        '53004': '5-4011',
+        '53005': '5-4013',
+        '53006': '5-3498'
+      };
+      return parsed.map((grp: CNGroupSchedule) => {
+        if (!grp.schedule) return grp;
+        const newSchedule: any = {};
+        for (const [ts, dayMap] of Object.entries(grp.schedule)) {
+          newSchedule[ts] = {};
+          for (const [day, cell] of Object.entries(dayMap as any)) {
+            const c = cell as any;
+            if (c && c.ucap && ucapMap[c.ucap]) {
+              newSchedule[ts][day] = { ...c, ucap: ucapMap[c.ucap] };
+            } else {
+              newSchedule[ts][day] = c;
+            }
+          }
+        }
+        return { ...grp, schedule: newSchedule };
+      });
+    } catch {
+      return initialCNGroupSchedules;
+    }
   });
 
   // 사용자 계정 및 권한 목록 (기본: initialUsers 슈퍼 관리자 포함)
