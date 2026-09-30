@@ -8,7 +8,7 @@ import {
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
   initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups,
-  ROLES
+  ROLES, sanitizeCNGroupSchedules
 } from './data/initialData';
 import { initialUsers } from './utils/authUtils';
 import { useSettings } from './context/SettingsContext';
@@ -256,7 +256,7 @@ export default function App() {
       if (!isOfficial1001Schedule) {
         return initialCNGroupSchedules;
       }
-      return parsed;
+      return sanitizeCNGroupSchedules(parsed);
     } catch {
       return initialCNGroupSchedules;
     }
@@ -311,7 +311,7 @@ export default function App() {
         if (settings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(settings[DB_KEYS.SHEETS_CONFIG]);
         if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(normalizeDutyRoles(settings[DB_KEYS.DUTY_ROLES]));
         if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
-        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
+        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(sanitizeCNGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]));
         if (settings[DB_KEYS.HOTLINES]) applyRemoteHotlines(settings[DB_KEYS.HOTLINES]);
         if (settings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
         if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);
@@ -348,7 +348,7 @@ export default function App() {
       if (remoteSettings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(remoteSettings[DB_KEYS.SHEETS_CONFIG]);
       if (remoteSettings[DB_KEYS.DUTY_ROLES]) setDutyRoles(normalizeDutyRoles(remoteSettings[DB_KEYS.DUTY_ROLES]));
       if (remoteSettings[DB_KEYS.DUTY_PHONES]) setDutyPhones(remoteSettings[DB_KEYS.DUTY_PHONES]);
-      if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]);
+      if (remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(sanitizeCNGroupSchedules(remoteSettings[DB_KEYS.CN_GROUP_SCHEDULES]));
       if (remoteSettings[DB_KEYS.HOTLINES]) applyRemoteHotlines(remoteSettings[DB_KEYS.HOTLINES]);
       if (remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(remoteSettings[DB_KEYS.INTERN_WARD_GROUPS]);
       if (remoteSettings[DB_KEYS.APP_USERS]) setUsers(remoteSettings[DB_KEYS.APP_USERS]);
@@ -449,7 +449,7 @@ export default function App() {
         if (settings[DB_KEYS.SHEETS_CONFIG]) setSheetsConfig(settings[DB_KEYS.SHEETS_CONFIG]);
         if (settings[DB_KEYS.DUTY_ROLES]) setDutyRoles(settings[DB_KEYS.DUTY_ROLES]);
         if (settings[DB_KEYS.DUTY_PHONES]) setDutyPhones(settings[DB_KEYS.DUTY_PHONES]);
-        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]);
+        if (settings[DB_KEYS.CN_GROUP_SCHEDULES]) setCnGroupSchedules(sanitizeCNGroupSchedules(settings[DB_KEYS.CN_GROUP_SCHEDULES]));
         if (settings[DB_KEYS.HOTLINES]) applyRemoteHotlines(settings[DB_KEYS.HOTLINES]);
         if (settings[DB_KEYS.INTERN_WARD_GROUPS]) applyRemoteInternWardGroups(settings[DB_KEYS.INTERN_WARD_GROUPS]);
         if (settings[DB_KEYS.APP_USERS]) setUsers(settings[DB_KEYS.APP_USERS]);

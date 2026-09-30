@@ -1071,6 +1071,35 @@ export const areWardsEqual = (w1?: string, w2?: string): boolean => {
   return clean1 === clean2;
 };
 
+/**
+ * 병동 목록에서 '42', '42W', '42병동' 또는 '한방', '한방병동' 등 중복되거나 비표준 명칭을
+ * ALL_WARDS 기준 표준 병동명으로 단일화하고 중복을 제거합니다.
+ */
+export const normalizeWardList = (wards: string[]): string[] => {
+  if (!wards || wards.length === 0) return [];
+  const normalized: string[] = [];
+  for (const raw of wards) {
+    if (!raw) continue;
+    const matched = ALL_WARDS.find(canonical => areWardsEqual(canonical, raw));
+    const target = matched || raw.trim();
+    if (!normalized.includes(target)) {
+      normalized.push(target);
+    }
+  }
+  return normalized;
+};
+
+/**
+ * CNGroupSchedule 배열 전체의 wards를 정규화하여 중복 및 비표준 병동 명칭을 일괄 정제합니다.
+ */
+export const sanitizeCNGroupSchedules = (groups: CNGroupSchedule[]): CNGroupSchedule[] => {
+  if (!Array.isArray(groups)) return [];
+  return groups.map(g => ({
+    ...g,
+    wards: normalizeWardList(g.wards).filter(w => g.id !== 'cng-5' || w !== '분만장')
+  }));
+};
+
 export const getCNPostContact = (roleName: string, cnPosts: CNPost[]): { ucap: string; phone: string } => {
   if (!roleName || !cnPosts || cnPosts.length === 0) return { ucap: '', phone: '' };
   const clean = roleName.replace(/\s+/g, '').toLowerCase();
@@ -1103,7 +1132,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-1',
     title: 'MICU, 42W, 주사실',
-    wards: ['MICU', '42', '42W', '42병동', '주사실'],
+    wards: ['MICU', '42병동', '주사실'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 1', ucap: '5-4003' }, 2: { role: '공통전담 1', ucap: '5-4003' }, 3: { role: '공통전담 1', ucap: '5-4003' },
@@ -1125,7 +1154,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-2',
     title: '한방, 92, 101, 121W',
-    wards: ['한방', '한방병동', '92', '92W', '92병동', '101', '101W', '101병동', '121', '121W', '121병동'],
+    wards: ['한방', '92병동', '101병동', '121병동'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 2', ucap: '5-4004' }, 2: { role: '공통전담 2', ucap: '5-4004' }, 3: { role: '공통전담 2', ucap: '5-4004' },
@@ -1147,7 +1176,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-3',
     title: '61, 62, 72W',
-    wards: ['61', '61W', '61병동', '62', '62W', '62병동', '72', '72W', '72병동'],
+    wards: ['61병동', '62병동', '72병동'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 3', ucap: '5-4006' }, 2: { role: '공통전담 3', ucap: '5-4006' }, 3: { role: '공통전담 3', ucap: '5-4006' },
@@ -1169,7 +1198,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-4',
     title: 'SICU, 81, 82W',
-    wards: ['SICU', '81', '81W', '81병동', '82', '82W', '82병동'],
+    wards: ['SICU', '81병동', '82병동'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 4', ucap: '5-4011' }, 2: { role: '공통전담 4', ucap: '5-4011' }, 3: { role: '공통전담 4', ucap: '5-4011' },
@@ -1192,7 +1221,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-5',
     title: '71, AKU, DR, DSR',
-    wards: ['71', '71W', '71병동', 'AKU', 'DR', 'DSR', '분만장'],
+    wards: ['71병동', 'AKU', 'DR', 'DSR'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 5', ucap: '5-4013' }, 2: { role: '공통전담 5', ucap: '5-4013' }, 3: { role: '공통전담 5', ucap: '5-4013' },
@@ -1215,7 +1244,7 @@ export const initialCNGroupSchedules: CNGroupSchedule[] = [
   {
     id: 'cng-6',
     title: '102, 111, 112W',
-    wards: ['102', '102W', '102병동', '111', '111W', '111병동', '112', '112W', '112병동'],
+    wards: ['102병동', '111병동', '112병동'],
     schedule: {
       'ts_day': {
         1: { role: '공통전담 6', ucap: '5-3498' }, 2: { role: '공통전담 6', ucap: '5-3498' }, 3: { role: '공통전담 6', ucap: '5-3498' },

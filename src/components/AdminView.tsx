@@ -516,12 +516,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   const handleToggleWardForPost = (postId: string, ward: string) => {
+    const canonicalWard = ALL_WARDS.find(canonical => areWardsEqual(canonical, ward)) || ward;
     setCnPosts(prev => prev.map(p => {
       if (p.id !== postId) return p;
       const exists = p.wards.some(w => areWardsEqual(w, ward));
       const updatedWards = exists 
         ? p.wards.filter(w => !areWardsEqual(w, ward)) 
-        : [...p.wards.filter(w => !areWardsEqual(w, ward)), ward];
+        : [...p.wards.filter(w => !areWardsEqual(w, ward)), canonicalWard];
       return { ...p, wards: updatedWards };
     }));
   };
@@ -600,16 +601,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   const handleToggleWardForGroup = (groupId: string, ward: string) => {
     if (!setCnGroupSchedules) return;
+    const canonicalWard = ALL_WARDS.find(canonical => areWardsEqual(canonical, ward)) || ward;
     setCnGroupSchedules(prev => prev.map(g => {
       if (g.id !== groupId) return g;
       const exists = g.wards.some(w => areWardsEqual(w, ward));
       const updatedWards = exists 
         ? g.wards.filter(w => !areWardsEqual(w, ward)) 
-        : [...g.wards.filter(w => !areWardsEqual(w, ward)), ward];
-      const updatedTitle = updatedWards.length > 0 ? updatedWards.join(', ') : g.title;
-      return { ...g, wards: updatedWards, title: updatedTitle };
+        : [...g.wards.filter(w => !areWardsEqual(w, ward)), canonicalWard];
+      return { ...g, wards: updatedWards };
     }));
-    showSaveSuccess(`병동 ${ward}이(가) 업데이트되었습니다.`);
+    showSaveSuccess(`병동 ${canonicalWard}이(가) 업데이트되었습니다.`);
   };
 
   const handleSyncGroupTitleWithWards = (groupId: string) => {
@@ -916,13 +917,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // --- Intern Ward Groups Handlers (내과 주간 1·2, 내과 당직 1·2, 비내과 1·2·3) ---
   const handleToggleWardForIntern = (roleId: string, ward: string) => {
     if (!setInternWardGroups) return;
+    const canonicalWard = ALL_WARDS.find(canonical => areWardsEqual(canonical, ward)) || ward;
     const baseGroups = normalizeInternWardGroups(internWardGroups && internWardGroups.length > 0 ? internWardGroups : initialInternWardGroups);
     const updated = baseGroups.map(g => {
       if (g.id !== roleId) return g;
       const exists = g.wards.some(w => areWardsEqual(w, ward));
       const updatedWards = exists
         ? g.wards.filter(w => !areWardsEqual(w, ward))
-        : [...g.wards.filter(w => !areWardsEqual(w, ward)), ward];
+        : [...g.wards.filter(w => !areWardsEqual(w, ward)), canonicalWard];
       return { ...g, wards: updatedWards };
     });
     setInternWardGroups(updated);
