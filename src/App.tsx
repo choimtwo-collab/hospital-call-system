@@ -252,10 +252,8 @@ export default function App() {
     try {
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return initialCNGroupSchedules;
-      const hasOldGroup = parsed.some((g: any) => g.title?.includes('81, 82W') && g.id === 'cng-1') ||
-                          parsed.some((g: any) => g.title?.includes('한방, 71W') && g.id === 'cng-2') ||
-                          parsed.some((g: any) => g.title?.includes('SICU, 61, 62W') && g.id === 'cng-3');
-      if (hasOldGroup) {
+      const isOfficial1001Schedule = parsed.some((g: any) => g.id === 'cng-2' && g.schedule?.ts_eve?.[1]?.role === '공통전담 1' && g.schedule?.ts_day?.[6]?.role === '공통전담 1');
+      if (!isOfficial1001Schedule) {
         return initialCNGroupSchedules;
       }
       return parsed;
