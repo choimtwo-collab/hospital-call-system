@@ -186,7 +186,7 @@ export const ALL_ADMIN_TABS: AdminTabInfo[] = [
   { id: 'sheets', name: '구글 시트 실시간 연동', description: '구글 스프레드시트 당직표 자동 동기화' },
   { id: 'tasks', name: '업무 마스터 설정', description: '20종 표준 업무 및 의사/전담간호사 매칭 규격' },
   { id: 'rules', name: '규칙 빌더 (Rule Builder)', description: '우선순위 기반 동적 당직 라우팅 규칙' },
-  { id: 'contacts', name: '의료진 & 임상병리사 연락망', description: '인턴/전공의 연락망 및 EKG 임상병리사 관리' },
+  { id: 'contacts', name: '의료진 & 심전도실 연락망', description: '인턴/전공의 연락망 및 EKG 심전도실/임상병리사 관리' },
   { id: 'common_nurse', name: '공통전담간호 근무 매트릭스', description: '3교대 근무표 및 포스트별 공용폰/UCAP 관리' },
   { id: 'hotlines', name: '주요 핫라인 관리', description: '원내 비상 핫라인 및 긴급 연락망 관리' },
   { id: 'data', name: '데이터 백업 & 복원', description: '전체 설정 JSON 백업 및 복원' },

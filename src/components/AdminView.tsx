@@ -324,16 +324,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
       }
     }
 
+    const isOct2026OrLater = defaultStart >= '2026-10-01';
     const newPath: PathologistSchedule = {
       id: `path-${Date.now()}`,
       startDate: defaultStart,
       endDate: defaultEnd,
       dayType: 'WEEKDAY',
-      startTime: '06:00',
-      endTime: '08:00',
-      name: '',
-      phone: '',
-      ucap: ''
+      startTime: isOct2026OrLater ? '06:00' : '06:00',
+      endTime: isOct2026OrLater ? '15:00' : '08:00',
+      name: isOct2026OrLater ? '심전도검사실 (Portable)' : '',
+      phone: isOct2026OrLater ? '7795' : '',
+      ucap: isOct2026OrLater ? '7795' : ''
     };
     const updated = [...pathologistSchedules, newPath];
     setPathologistSchedules(updated);
@@ -3101,7 +3102,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="flex items-center gap-2.5">
                   <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                     <Users className="w-5 h-5 text-cyan-400" />
-                    임상병리사 정규 EKG 순환 일정 관리
+                    심전도실 / EKG 순환 일정 관리
                   </h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -3109,7 +3110,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  기간(시작일~종료일), 근무 구분(평일/공휴일/매일), 담당 시간대(시작~종료)를 관리자가 직접 조정할 수 있습니다.
+                  기간(시작일~종료일), 근무 구분(평일/공휴일/매일), 담당 시간대(시작~종료)를 관리자가 직접 조정할 수 있습니다. (2026.10.01부 심전도실 내선 7795 이관)
                 </p>
               </div>
 
@@ -3121,7 +3122,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   title="현재 수정된 모든 일정을 Neon DB에 즉시 저장합니다"
                 >
                   <Save className={`w-3.5 h-3.5 ${isSavingPathologist ? 'animate-spin' : ''}`} />
-                  {isSavingPathologist ? '저장 중...' : '임상병리사 일정 저장'}
+                  {isSavingPathologist ? '저장 중...' : 'EKG/심전도 일정 저장'}
                 </button>
 
                 <button
@@ -3143,8 +3144,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <th className="p-3 min-w-[250px]">기간 (시작일 ~ 종료일)</th>
                     <th className="p-3 w-32">근무 구분</th>
                     <th className="p-3 min-w-[170px]">시간대 (시작 ~ 종료)</th>
-                    <th className="p-3 w-28">담당 임상병리사</th>
-                    <th className="p-3 w-36">연락처 (휴대전화)</th>
+                    <th className="p-3 w-36">담당 부서/임상병리사</th>
+                    <th className="p-3 w-36">연락처 (휴대전화/내선)</th>
                     <th className="p-3 w-28">원내 내선/UCAP</th>
                     <th className="p-3 w-14 text-center">삭제</th>
                   </tr>
@@ -3290,7 +3291,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  💡 <strong>자동 매칭 안내:</strong> 간호사 화면에서 <strong>정규 EKG</strong> 호출 시, 설정된 기간 및 시간대(기본 06:00~08:00)에 해당하는 임상병리사가 최우선 자동 배정됩니다. (설정 시간 외에는 해당 병동 당직 인턴으로 자동 연결됩니다)
+                  💡 <strong>자동 매칭 안내:</strong> 2026년 10월 1일부터 Portable ECG 검사가 기존 진료지원팀에서 <strong>심전도실(내선 7795)</strong>로 이관되었습니다. 평일 조출(06:00~15:00) 및 정규 오후(15:00~17:00, 17시 이전 처방까지)에는 심전도검사실이 최우선 자동 배정됩니다. (그 외 시간 및 주말/공휴일에는 해당 병동 당직 인턴으로 자동 연결됩니다)
                 </span>
               </div>
               <div className="text-[11px] text-slate-500">

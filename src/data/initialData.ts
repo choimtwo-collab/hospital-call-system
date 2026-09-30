@@ -284,15 +284,17 @@ export const initialTasks: TaskItem[] = [
     dept: 'ALL',
     category: '검사',
     isNurseSupport: 'N',
-    nurseSupportNote: '지원 불가',
+    nurseSupportNote: '지원 불가 (심전도실/인턴 전담)',
     timeRuleType: '특정 시간 예외형',
-    description: `• 평일 06:00~08:00 (아침 정규): 일자별 지정된 임상병리사 연결.
-• 평일 정규 (08:00~17:00):
-  - 내과계: 인턴 개인 UCAP 연결.
-  - 비내과계: 당직인턴2 (Group C 병동) 또는 당직인턴3 (Group D 병동) 연결.
-• 정규 외 (야간/주말):
-  - 내과계: 병동 Group 1 및 MICU는 내과계 당직인턴1 / 병동 Group 2는 내과계 당직인턴2 연결.
-  - 비내과계: 당직인턴2 (Group C) 또는 당직인턴3 (Group D) 연결.`
+    description: `• [2026.10.01 부서 이관] 진료지원팀 -> 심전도실 이관 시행 (문의: 심전도검사실(Portable) 내선 7795)
+• 심전도실 운영시간 (평일):
+  - 조출 근무 (06:00~15:00): 06:00부터 정규 오전 Portable ECG 검사 시행
+  - 정규 근무 (08:30~17:30): 15:00부터 정규 오후 Portable ECG 검사 시행 (17시 이전 처방까지만 검사)
+  * 응급검사: 우선 시행 (요청 시 응급 여부 반드시 확인)
+  * 근무자 결원 및 휴가 시: 조출 근무시간에 준하여 시행
+• 심전도실 미운영 시간 (평일 17:00 이후 / 주말 및 공휴일 종일):
+  - 내과계: 병동 Group 1 및 MICU는 내과계 당직인턴 1 / 병동 Group 2는 내과계 당직인턴 2 연결
+  - 비내과계: 당직인턴 2 (Group C) 또는 당직인턴 3 (Group D) 연결`
   },
   {
     id: 'TSK_ABGA',
@@ -734,7 +736,7 @@ export const initialContacts: ContactMap = {
   '전하윤': { phone: '010-2938-1029', ucap: '52643', dumcTalk: '전하윤(인턴)' }, 
   '유성윤': { phone: '010-9281-0492', ucap: '52604', dumcTalk: '유성윤(인턴)' },
   [ROLES.DUTY_NURSE]: { phone: '010-8888-0001', ucap: '5-4001', dumcTalk: '당직전담실' },
-  [ROLES.PATHOLOGIST]: { phone: '010-9907-8298(황예진)', ucap: '5-9907', dumcTalk: '임상병리사_황예진' },
+  [ROLES.PATHOLOGIST]: { phone: '7795', ucap: '7795', dumcTalk: '심전도검사실(Portable)' },
   [ROLES.INTERN]: { phone: '근무표 참조', ucap: '근무표 참조', dumcTalk: '해당과인턴' }
 };
 
@@ -1146,6 +1148,7 @@ export const emergencyContacts: EmergencyContact[] = [
   { id: 'em-4', name: '수술실 본원 데스크', dept: '수술실', ucap: '5-3300', phone: '010-8888-3300', category: 'OR' },
   { id: 'em-5', name: '진단검사의학과 야간', dept: '진단검사의학', ucap: '5-4400', phone: '010-8888-4400', category: 'LAB' },
   { id: 'em-6', name: '약제팀 야간 조제실', dept: '약제팀', ucap: '5-5500', phone: '010-8888-5500', category: 'ADMIN' },
+  { id: 'em-7', name: '심전도검사실 (Portable)', dept: '심전도실', ucap: '7795', phone: '내선 7795', category: 'LAB' },
 ];
 
 export const initialPathologistSchedules: PathologistSchedule[] = [
@@ -1170,5 +1173,27 @@ export const initialPathologistSchedules: PathologistSchedule[] = [
     name: '윤은솔', 
     phone: '010-8821-4928', 
     ucap: '5-9908' 
+  },
+  { 
+    id: 'path-3', 
+    startDate: '2026-10-01', 
+    endDate: '2026-12-31', 
+    dayType: 'WEEKDAY', 
+    startTime: '06:00', 
+    endTime: '15:00', 
+    name: '심전도검사실 (조출/오전검사)', 
+    phone: '7795', 
+    ucap: '7795' 
+  },
+  { 
+    id: 'path-4', 
+    startDate: '2026-10-01', 
+    endDate: '2026-12-31', 
+    dayType: 'WEEKDAY', 
+    startTime: '15:00', 
+    endTime: '17:00', 
+    name: '심전도검사실 (정규/오후검사)', 
+    phone: '7795', 
+    ucap: '7795' 
   }
 ];

@@ -317,6 +317,7 @@ export function evaluateDutyRules(
     // -----------------------------------------------------------------------
     // 규칙 0: 임상병리사 예외 규칙 (관리자가 조정한 기간, 평일/공휴일, 시간대 적용)
     // -----------------------------------------------------------------------
+    const isOct2026OrLater = selectedDate >= '2026-10-01';
     const matchedPathologist = pathologistSchedules.find(p => {
       if (p.startDate && selectedDate < p.startDate) return false;
       if (p.endDate && selectedDate > p.endDate) return false;
@@ -324,7 +325,7 @@ export function evaluateDutyRules(
       if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
       if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
       const sTime = p.startTime || '06:00';
-      const eTime = p.endTime || '08:00';
+      const eTime = p.endTime || (isOct2026OrLater ? '17:00' : '08:00');
       if (selectedTime < sTime || selectedTime >= eTime) return false;
       return true;
     });
@@ -334,13 +335,29 @@ export function evaluateDutyRules(
       assignedRole = '공통 전담간호사 & 당직의료진 (동시 호출)';
       notes = '병동 내 응급상황: 공통 전담간호사와 당직 의료진이 동시에 자동 호출됩니다.';
     }
-    else if (isTask('EKG') && (matchedPathologist || (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8))) {
-      assignedRole = ROLES.PATHOLOGIST;
-      if (matchedPathologist) {
-        const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
-        notes = `${matchedPathologist.name} 임상병리사 순환일정 매칭 (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '08:00'})`;
-      } else {
-        notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+    else if (isTask('EKG')) {
+      // 2026-10-01 이전: 평일 06:00~08:00 진료지원팀 임상병리사
+      // 2026-10-01 이후: 심전도실 이관 (평일 조출 06:00~15:00 정규 오전검사, 정규 15:00~17:00 정규 오후검사, 17시 이전 처방까지 검사)
+      const isDefaultECGHours = isOct2026OrLater
+        ? (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 17)
+        : (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8);
+
+      if (matchedPathologist || isDefaultECGHours) {
+        assignedRole = ROLES.PATHOLOGIST;
+        if (matchedPathologist) {
+          const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
+          if (isOct2026OrLater) {
+            notes = `심전도실 이관 매칭: ${matchedPathologist.name} (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '17:00'}) - 문의: 심전도검사실(Portable) 내선 7795 (17시 이전 처방까지 검사, 응급 검사 우선)`;
+          } else {
+            notes = `${matchedPathologist.name} 임상병리사 순환일정 매칭 (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '08:00'})`;
+          }
+        } else {
+          if (isOct2026OrLater) {
+            notes = '2026.10.01부 심전도실 이관 시행: 평일 Portable ECG는 심전도검사실(내선 7795)에서 담당합니다. (조출 06:00~ / 정규오후 15:00~17:00, 17시 이전 처방까지, 응급 우선)';
+          } else {
+            notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+          }
+        }
       }
     }
 
@@ -748,9 +765,10 @@ export function evaluateDutyRules(
       }
     }
   } 
-  // 임상병리사 일정 매칭
+  // 임상병리사 / 심전도실 일정 매칭
   else if (assignedRole === ROLES.PATHOLOGIST) {
-    assignedPerson = '임상병리사 (EKG 전담)';
+    const isOct2026OrLater = selectedDate >= '2026-10-01';
+    assignedPerson = isOct2026OrLater ? '심전도검사실 (Portable)' : '임상병리사 (EKG 전담)';
     const matchedPathologist = pathologistSchedules.find(p => {
       if (p.startDate && selectedDate < p.startDate) return false;
       if (p.endDate && selectedDate > p.endDate) return false;
@@ -758,23 +776,31 @@ export function evaluateDutyRules(
       if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
       if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
       const sTime = p.startTime || '06:00';
-      const eTime = p.endTime || '08:00';
+      const eTime = p.endTime || (isOct2026OrLater ? '17:00' : '08:00');
       if (selectedTime < sTime || selectedTime >= eTime) return false;
       return true;
     });
     if (matchedPathologist) {
-      assignedPerson = `${matchedPathologist.name} (임상병리사)`;
+      assignedPerson = isOct2026OrLater 
+        ? matchedPathologist.name 
+        : `${matchedPathologist.name} (임상병리사)`;
       dutyPhone = matchedPathologist.phone;
       dutyUcap = matchedPathologist.ucap;
       contactInfo = {
         phone: matchedPathologist.phone,
         ucap: matchedPathologist.ucap,
-        dumcTalk: `임상병리사_${matchedPathologist.name}`
+        dumcTalk: isOct2026OrLater ? `심전도실_${matchedPathologist.name}` : `임상병리사_${matchedPathologist.name}`
       };
     } else {
-      contactInfo = contacts[ROLES.PATHOLOGIST] || { phone: '010-9907-8298', ucap: '5-9907', dumcTalk: '임상병리사' };
-      dutyPhone = contactInfo.phone;
-      dutyUcap = contactInfo.ucap;
+      if (isOct2026OrLater) {
+        contactInfo = { phone: '7795', ucap: '7795', dumcTalk: '심전도검사실(Portable)' };
+        dutyPhone = '7795';
+        dutyUcap = '7795';
+      } else {
+        contactInfo = contacts[ROLES.PATHOLOGIST] || { phone: '010-9907-8298', ucap: '5-9907', dumcTalk: '임상병리사' };
+        dutyPhone = contactInfo.phone;
+        dutyUcap = contactInfo.ucap;
+      }
     }
   }
   // 일반 인턴 및 당직의 매칭

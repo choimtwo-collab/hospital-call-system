@@ -7,7 +7,8 @@ import {
   initialSchedules, initialContacts, initialTimeSlots, 
   initialCNPosts, initialWeeklyCNSchedule, initialTasks, 
   initialCustomRules, initialInterns, initialPathologistSchedules,
-  initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups
+  initialDutyRoles, initialDutyPhones, initialCNGroupSchedules, emergencyContacts, initialInternWardGroups,
+  ROLES
 } from './data/initialData';
 import { initialUsers } from './utils/authUtils';
 import { useSettings } from './context/SettingsContext';
@@ -121,7 +122,16 @@ export default function App() {
 
   const [contacts, setContacts] = useState<ContactMap>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CONTACTS);
-    return saved ? JSON.parse(saved) : initialContacts;
+    if (!saved) return initialContacts;
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed[ROLES.PATHOLOGIST] && !parsed[ROLES.PATHOLOGIST].phone.includes('7795')) {
+        parsed[ROLES.PATHOLOGIST] = initialContacts[ROLES.PATHOLOGIST];
+      }
+      return parsed;
+    } catch {
+      return initialContacts;
+    }
   });
 
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(() => {
@@ -152,7 +162,13 @@ export default function App() {
       ) {
         return initialTasks;
       }
-      return parsed;
+      return parsed.map((t: TaskItem) => {
+        if (t.id === 'TSK_EKG_P' && !t.description?.includes('7795')) {
+          const fresh = initialTasks.find(it => it.id === 'TSK_EKG_P');
+          return fresh ? { ...t, description: fresh.description, nurseSupportNote: fresh.nurseSupportNote } : t;
+        }
+        return t;
+      });
     } catch {
       return initialTasks;
     }
@@ -170,7 +186,19 @@ export default function App() {
 
   const [pathologistSchedules, setPathologistSchedules] = useState<PathologistSchedule[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PATHOLOGISTS);
-    return saved ? JSON.parse(saved) : initialPathologistSchedules;
+    if (!saved) return initialPathologistSchedules;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialPathologistSchedules;
+      const hasOctober = parsed.some((p: PathologistSchedule) => p.startDate >= '2026-10-01' || p.endDate >= '2026-10-01');
+      if (!hasOctober) {
+        const octSchedules = initialPathologistSchedules.filter(p => p.startDate >= '2026-10-01');
+        return [...parsed, ...octSchedules];
+      }
+      return parsed;
+    } catch {
+      return initialPathologistSchedules;
+    }
   });
 
   const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => {
