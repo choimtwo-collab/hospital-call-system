@@ -3409,7 +3409,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.ucap}
-                                placeholder="예: 5-4080"
+                                placeholder={dp.roleName.includes('2') ? '예: 5-4084' : '예: 5-4083'}
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'ucap', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-400"
                               />
@@ -3418,7 +3418,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.phone}
-                                placeholder="예: 010-0000-0000"
+                                placeholder={dp.roleName.includes('2') ? '예: 010-5749-4170' : '예: 010-5718-4170'}
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'phone', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-400"
                               />
@@ -3427,7 +3427,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.notes || ''}
-                                placeholder="메모 (예: 개인폰(UCAP) 기본 사용)"
+                                placeholder="메모 (예: 정규 당직폰)"
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'notes', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-400"
                               />
@@ -3559,7 +3559,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         📱 비내과계 당직폰 (공용 UCAP / 핸드폰)
                       </h5>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        * 비내과계 필수 콜 접수용 공용 당직폰 번호 및 원내 UCAP입니다. (비내과 1: 5-4080, 비내과 2: 5-4081, 비내과 3: 5-3499(임시))
+                        * 비내과계 필수 콜 접수용 공용 당직폰 번호 및 원내 UCAP입니다. (비내과 1: 5-4080, 비내과 2: 5-4081, 비내과 3: 5-4082)
                       </p>
                     </div>
                     <button
@@ -3597,7 +3597,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.ucap}
-                                placeholder="예: 5-4080"
+                                placeholder={dp.roleName.includes('3') ? '예: 5-4082' : dp.roleName.includes('2') ? '예: 5-4081' : '예: 5-4080'}
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'ucap', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-400"
                               />
@@ -3606,7 +3606,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.phone}
-                                placeholder="예: 010-7628-5803"
+                                placeholder={dp.roleName.includes('3') ? '예: 010-5714-4170' : dp.roleName.includes('2') ? '예: 010-7624-5803' : '예: 010-7628-5803'}
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'phone', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-400"
                               />
@@ -3615,7 +3615,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                               <input
                                 type="text"
                                 value={dp.notes || ''}
-                                placeholder="메모 (예: 정규 당직폰, (임시) 등)"
+                                placeholder="메모 (예: 정규 당직폰)"
                                 onChange={e => handleUpdateDutyPhone(dp.id, 'notes', e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-emerald-400"
                               />

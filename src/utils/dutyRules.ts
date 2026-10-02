@@ -528,7 +528,7 @@ export function evaluateDutyRules(
         const isGroupC = isNonIM2Ward;
         if (isGroupC) {
           assignedRole = ROLES.NON_IM_2;
-          backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-3499)';
+          backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-4082)';
           dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
           dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
           notes = '비내과계 병동 Group C(SICU, 42, 61, 62 등) 수혈 동의서는 비내과 당직인턴 2(5-4081) 담당입니다 (전담간호사 지원 불가).';
@@ -543,7 +543,7 @@ export function evaluateDutyRules(
           backupRole = '1순위: 비내과1 (5-4080)';
           dutyPhone = DUTY_PHONES[ROLES.NON_IM_3];
           dutyUcap = DUTY_UCAPS[ROLES.NON_IM_3];
-          notes = '비내과계 병동 Group D(71~121) 수혈 동의서는 비내과 당직인턴 3(5-3499) 담당입니다 (전담간호사 지원 불가).';
+          notes = '비내과계 병동 Group D(71~121) 수혈 동의서는 비내과 당직인턴 3(5-4082) 담당입니다 (전담간호사 지원 불가).';
         }
       }
       // 1. 상시 공통 전담간호사 지원 업무 (Category 1, 2)
@@ -602,9 +602,9 @@ export function evaluateDutyRules(
         if (isGroupC) {
           // 병동 그룹 C (SICU, 분만장, 42, 61, 62, NICU)
           // -> 비내과 당직인턴 2 (010-7624-5803 / 5-4081)
-          // 백업: 1순위 비내과1(5-4080), 2순위 비내과3(5-3499)
+          // 백업: 1순위 비내과1(5-4080), 2순위 비내과3(5-4082)
           assignedRole = ROLES.NON_IM_2;
-          backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-3499)';
+          backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-4082)';
           dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
           dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
           notes = '비내과계 병동 Group C (SICU, 분만장, 42, 61, 62, NICU 등) 비내과2 전담.';
@@ -616,7 +616,7 @@ export function evaluateDutyRules(
           notes = '비내과계 지정 담당 병동 비내과1 전담.';
         } else if (isGroupD) {
           // 병동 그룹 D (71, 72, 81, 82, 92, 101, 102, 111, 112, 121)
-          // -> 비내과 당직인턴 3 (010-5794-4170 / 5-3499)
+          // -> 비내과 당직인턴 3 (010-5714-4170 / 5-4082)
           // 백업: 1순위 비내과1(5-4080)
           assignedRole = ROLES.NON_IM_3;
           backupRole = '1순위: 비내과1 (5-4080)';
@@ -849,7 +849,17 @@ export function evaluateDutyRules(
     const cleanAssigned = (assignedRole || '').replace(/\s+/g, '');
     const matchedDutyPhone = cleanAssigned ? dutyPhones.find(dp => {
       const cleanDp = dp.roleName.replace(/\s+/g, '');
-      return cleanDp === cleanAssigned || cleanAssigned.includes(cleanDp) || cleanDp.includes(cleanAssigned);
+      if (cleanDp === cleanAssigned || cleanAssigned.includes(cleanDp) || cleanDp.includes(cleanAssigned)) return true;
+      if (cleanAssigned.includes('내과') && cleanDp.includes('내과')) {
+        if (cleanAssigned.includes('1') && cleanDp.includes('1')) return true;
+        if (cleanAssigned.includes('2') && cleanDp.includes('2')) return true;
+      }
+      if (cleanAssigned.includes('비내과') && cleanDp.includes('비내과')) {
+        if (cleanAssigned.includes('1') && cleanDp.includes('1')) return true;
+        if (cleanAssigned.includes('2') && cleanDp.includes('2')) return true;
+        if (cleanAssigned.includes('3') && cleanDp.includes('3')) return true;
+      }
+      return false;
     }) : undefined;
 
     // 1순위: 관리자 의료진 연락망(interns)에서 전공의 성명 매칭하여 개인 UCAP 및 개인폰 실시간 조회
@@ -864,7 +874,7 @@ export function evaluateDutyRules(
       contactInfo = contacts[assignedPerson];
     }
 
-    // 내과계 인턴: 개인 UCAP 및 개인폰 우선 (공용 당직폰이 지정된 경우 당직폰 우선)
+    // 내과계 인턴: 공용 당직폰 번호가 등록된 경우 당직폰 우선 (미등록 시 개인 UCAP/개인폰)
     if (assignedRole === ROLES.IM_1 || assignedRole === ROLES.IM_2 || assignedRole?.includes('내과')) {
       dutyUcap = dutyUcap || (matchedDutyPhone && matchedDutyPhone.ucap) || contactInfo.ucap;
       dutyPhone = dutyPhone || (matchedDutyPhone && matchedDutyPhone.phone) || contactInfo.phone;
@@ -903,8 +913,8 @@ export function evaluateDutyRules(
   } else if (backupRole.includes('비내과3')) {
     backupContact2 = {
       roleName: '비내과3 (당직인턴3)',
-      phone: DUTY_PHONES[ROLES.NON_IM_3] || '010-5794-4170',
-      ucap: DUTY_UCAPS[ROLES.NON_IM_3] || '5-3499'
+      phone: DUTY_PHONES[ROLES.NON_IM_3] || '010-5714-4170',
+      ucap: DUTY_UCAPS[ROLES.NON_IM_3] || '5-4082'
     };
   }
 

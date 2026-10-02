@@ -98,15 +98,23 @@ export function getRelatedRoleKeys(role: string): string[] {
 }
 
 export const DUTY_PHONES: Record<string, string> = {
+  [ROLES.IM_1]: '010-5718-4170',
+  [ROLES.IM_2]: '010-5749-4170',
+  [ROLES.IM_DUTY_1]: '010-5718-4170',
+  [ROLES.IM_DUTY_2]: '010-5749-4170',
   [ROLES.NON_IM_1]: '010-7628-5803',
   [ROLES.NON_IM_2]: '010-7624-5803',
-  [ROLES.NON_IM_3]: '010-5794-4170'
+  [ROLES.NON_IM_3]: '010-5714-4170'
 };
 
 export const DUTY_UCAPS: Record<string, string> = {
+  [ROLES.IM_1]: '5-4083',
+  [ROLES.IM_2]: '5-4084',
+  [ROLES.IM_DUTY_1]: '5-4083',
+  [ROLES.IM_DUTY_2]: '5-4084',
   [ROLES.NON_IM_1]: '5-4080',
   [ROLES.NON_IM_2]: '5-4081',
-  [ROLES.NON_IM_3]: '5-3499'
+  [ROLES.NON_IM_3]: '5-4082'
 };
 
 // 병동 그룹화 정의 (명세서 기준)
@@ -224,8 +232,8 @@ export const initialInternWardGroups: InternWardGroupSetting[] = [
     timeDescription: '상시 / 당직',
     title: '비내과계 병동 Group D (71~121병동 등)',
     wards: ['71병동', '72병동', '81병동', '82병동', '92병동', '101병동', '102병동', '111병동', '112병동', '121병동'],
-    defaultPhone: '010-5794-4170',
-    defaultUcap: '5-3499',
+    defaultPhone: '010-5714-4170',
+    defaultUcap: '5-4082',
     description: '71, 72, 81, 82, 92, 101, 102, 111, 112, 121병동 등 비내과계 전담'
   }
 ];
@@ -682,17 +690,17 @@ export const initialDutyPhones: DutyPhoneItem[] = [
     id: 'dp-im-1',
     deptCategory: '내과',
     roleName: '내과 1',
-    phone: '',
-    ucap: '',
-    notes: '개인폰(UCAP) 기본 사용'
+    phone: '010-5718-4170',
+    ucap: '5-4083',
+    notes: '정규 당직폰'
   },
   {
     id: 'dp-im-2',
     deptCategory: '내과',
     roleName: '내과 2',
-    phone: '',
-    ucap: '',
-    notes: '개인폰(UCAP) 기본 사용'
+    phone: '010-5749-4170',
+    ucap: '5-4084',
+    notes: '정규 당직폰'
   },
   // 비내과계 당직폰
   {
@@ -715,11 +723,44 @@ export const initialDutyPhones: DutyPhoneItem[] = [
     id: 'dp-non-3',
     deptCategory: '비내과',
     roleName: '비내과 3',
-    phone: '010-5794-4170',
-    ucap: '5-3499',
-    notes: '(임시)'
+    phone: '010-5714-4170',
+    ucap: '5-4082',
+    notes: '정규 당직폰'
   }
 ];
+
+/**
+ * 저장된 당직폰 목록을 최신 공식 당직폰 번호 체계로 검증 및 보정합니다.
+ */
+export function normalizeDutyPhones(phones?: DutyPhoneItem[]): DutyPhoneItem[] {
+  if (!phones || !Array.isArray(phones) || phones.length === 0) return initialDutyPhones;
+
+  const defaultMap: Record<string, { phone: string; ucap: string; notes?: string }> = {
+    'dp-im-1': { phone: '010-5718-4170', ucap: '5-4083', notes: '정규 당직폰' },
+    'dp-im-2': { phone: '010-5749-4170', ucap: '5-4084', notes: '정규 당직폰' },
+    'dp-non-1': { phone: '010-7628-5803', ucap: '5-4080', notes: '정규 당직폰' },
+    'dp-non-2': { phone: '010-7624-5803', ucap: '5-4081', notes: '정규 당직폰' },
+    'dp-non-3': { phone: '010-5714-4170', ucap: '5-4082', notes: '정규 당직폰' }
+  };
+
+  return phones.map(p => {
+    // 내과 1이 비어있거나 구버전인 경우
+    if (p.id === 'dp-im-1' && (!p.phone || !p.ucap)) {
+      return { ...p, phone: '010-5718-4170', ucap: '5-4083', notes: p.notes === '개인폰(UCAP) 기본 사용' ? '정규 당직폰' : p.notes };
+    }
+    // 내과 2가 비어있거나 구버전인 경우
+    if (p.id === 'dp-im-2' && (!p.phone || !p.ucap)) {
+      return { ...p, phone: '010-5749-4170', ucap: '5-4084', notes: p.notes === '개인폰(UCAP) 기본 사용' ? '정규 당직폰' : p.notes };
+    }
+    // 비내과 3 임시 번호(5-3499 또는 010-5794-4170) -> 정규 번호(5-4082 / 010-5714-4170)로 마이그레이션
+    if (p.id === 'dp-non-3') {
+      if (p.ucap === '5-3499' || p.phone === '010-5794-4170' || !p.phone || !p.ucap) {
+        return { ...p, phone: '010-5714-4170', ucap: '5-4082', notes: p.notes === '(임시)' ? '정규 당직폰' : p.notes };
+      }
+    }
+    return p;
+  });
+}
 
 export const initialContacts: ContactMap = {
   '정소영': { phone: '010-3948-1029', ucap: '52644', dumcTalk: '정소영(인턴)' }, 
