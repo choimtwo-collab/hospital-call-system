@@ -295,14 +295,14 @@ export const initialTasks: TaskItem[] = [
     nurseSupportNote: '지원 불가 (심전도실/인턴 전담)',
     timeRuleType: '특정 시간 예외형',
     description: `• [2026.10.01 부서 이관] 진료지원팀 -> 심전도실 이관 시행 (문의: 심전도검사실(Portable) 내선 7795)
-• 심전도실 운영시간 (평일):
+• 심전도실 운영시간 (평일 06:00~17:30):
   - 조출 근무 (06:00~15:00): 06:00부터 정규 오전 Portable ECG 검사 시행
   - 정규 근무 (08:30~17:30): 15:00부터 정규 오후 Portable ECG 검사 시행 (17시 이전 처방까지만 검사)
   * 응급검사: 우선 시행 (요청 시 응급 여부 반드시 확인)
   * 근무자 결원 및 휴가 시: 조출 근무시간에 준하여 시행
-• 심전도실 미운영 시간 (평일 17:00 이후 / 주말 및 공휴일 종일):
-  - 내과계: 병동 Group 1 및 MICU는 내과계 당직인턴 1 / 병동 Group 2는 내과계 당직인턴 2 연결
-  - 비내과계: 당직인턴 2 (Group C) 또는 당직인턴 3 (Group D) 연결`
+• 심전도실 미운영 시간 (평일 17:31~익일 05:59 / 주말 및 공휴일 종일):
+  - 내과계: 병동 Group 1 및 MICU는 내과인턴당직 1 / 병동 Group 2는 내과인턴당직 2 연결
+  - 비내과계: 해당 병동 담당 비내과 당직인턴(비내과 1 / Group C 비내과 2 / Group D 비내과 3) 연결`
   },
   {
     id: 'TSK_ABGA',
@@ -1577,7 +1577,7 @@ export const initialPathologistSchedules: PathologistSchedule[] = [
     endDate: '2026-12-31', 
     dayType: 'WEEKDAY', 
     startTime: '15:00', 
-    endTime: '17:00', 
+    endTime: '17:30', 
     name: '심전도검사실 (정규/오후검사)', 
     phone: '7795', 
     ucap: '7795' 

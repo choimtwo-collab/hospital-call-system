@@ -315,47 +315,103 @@ export function evaluateDutyRules(
   // =========================================================================
   if (!assignedRole) {
     // -----------------------------------------------------------------------
-    // 규칙 0: 임상병리사 예외 규칙 (관리자가 조정한 기간, 평일/공휴일, 시간대 적용)
+    // 규칙 0: 임상병리사 / 심전도실 예외 규칙 (관리자가 조정한 기간, 평일/공휴일, 시간대 적용)
+    // 심전도 검사는 17:31 ~ 익일 05:59 (및 주말/공휴일)에는 반드시 해당 병동 당직 인턴에게 매칭
     // -----------------------------------------------------------------------
     const isOct2026OrLater = selectedDate >= '2026-10-01';
-    const matchedPathologist = pathologistSchedules.find(p => {
+    const isECGDutyInternWindow = isWeekendOrHoliday || timeMinutes >= 1051 || timeMinutes <= 359; // 17:31 ~ 익일 05:59 또는 주말/공휴일
+    const matchedPathologist = !isECGDutyInternWindow ? pathologistSchedules.find(p => {
       if (p.startDate && selectedDate < p.startDate) return false;
       if (p.endDate && selectedDate > p.endDate) return false;
       const dayType = p.dayType || 'WEEKDAY';
       if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
       if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
       const sTime = p.startTime || '06:00';
-      const eTime = p.endTime || (isOct2026OrLater ? '17:00' : '08:00');
-      if (selectedTime < sTime || selectedTime >= eTime) return false;
+      const eTime = p.endTime || (isOct2026OrLater ? '17:30' : '08:00');
+      if (selectedTime < sTime || selectedTime > eTime) return false;
       return true;
-    });
+    }) : undefined;
 
     // 응급상황 CPR 및 응급약물 투여 (진료과/시간대 무관 공통 동시 호출)
     if (isTask('CPR') || isTask('응급약물') || isTask('응급상황')) {
       assignedRole = '공통 전담간호사 & 당직의료진 (동시 호출)';
       notes = '병동 내 응급상황: 공통 전담간호사와 당직 의료진이 동시에 자동 호출됩니다.';
     }
-    else if (isTask('EKG')) {
+    else if (isTask('EKG') || isTask('심전도')) {
       // 2026-10-01 이전: 평일 06:00~08:00 진료지원팀 임상병리사
-      // 2026-10-01 이후: 심전도실 이관 (평일 조출 06:00~15:00 정규 오전검사, 정규 15:00~17:00 정규 오후검사, 17시 이전 처방까지 검사)
-      const isDefaultECGHours = isOct2026OrLater
-        ? (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 17)
-        : (!isWeekendOrHoliday && timeDecimal >= 6 && timeDecimal < 8);
+      // 2026-10-01 이후: 심전도실 이관 (평일 06:00~17:30 심전도검사실 내선 7795)
+      // 17:31 ~ 다음날 05:59 (및 주말/공휴일): 해당 병동 당직 인턴에게 매칭하여 연락처 조회
+      const isDefaultECGHours = !isECGDutyInternWindow && (
+        isOct2026OrLater
+          ? (!isWeekendOrHoliday && timeMinutes >= 360 && timeMinutes <= 1050)
+          : (!isWeekendOrHoliday && timeMinutes >= 360 && timeMinutes < 480)
+      );
 
       if (matchedPathologist || isDefaultECGHours) {
         assignedRole = ROLES.PATHOLOGIST;
         if (matchedPathologist) {
           const dayLabel = matchedPathologist.dayType === 'WEEKDAY' ? '평일' : (matchedPathologist.dayType === 'WEEKEND_HOLIDAY' ? '주말/공휴일' : '매일');
           if (isOct2026OrLater) {
-            notes = `심전도실 이관 매칭: ${matchedPathologist.name} (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '17:00'}) - 문의: 심전도검사실(Portable) 내선 7795 (17시 이전 처방까지 검사, 응급 검사 우선)`;
+            notes = `심전도실 이관 매칭: ${matchedPathologist.name} (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '17:30'}) - 문의: 심전도검사실(Portable) 내선 7795 (17시 이전 처방까지 검사, 응급 검사 우선)`;
           } else {
             notes = `${matchedPathologist.name} 임상병리사 순환일정 매칭 (${dayLabel} ${matchedPathologist.startTime || '06:00'}~${matchedPathologist.endTime || '08:00'})`;
           }
         } else {
           if (isOct2026OrLater) {
-            notes = '2026.10.01부 심전도실 이관 시행: 평일 Portable ECG는 심전도검사실(내선 7795)에서 담당합니다. (조출 06:00~ / 정규오후 15:00~17:00, 17시 이전 처방까지, 응급 우선)';
+            notes = '2026.10.01부 심전도실 이관 시행: 평일(06:00~17:30) Portable ECG는 심전도검사실(내선 7795)에서 담당합니다. (조출 06:00~15:00 / 정규오후 15:00~17:30, 17시 이전 처방까지, 응급 우선)';
           } else {
             notes = '평일 06:00~08:00 정규 EKG(P)는 임상병리사 담당입니다.';
+          }
+        }
+      } else {
+        // 17:31 ~ 다음날 05:59 (또는 주말/공휴일, 또는 2026-10-01 이전 평일 주간): 해당 병동 당직 인턴 매칭
+        if (selectedDept === '내과') {
+          if (isECGDutyInternWindow || isDutyHours) {
+            const isGroup2 = isIMDuty2Ward || (!isIMDuty1Ward && WARD_GROUPS.GROUP_B.some(w => areWardsEqual(w, selectedWard)));
+            if (isGroup2) {
+              assignedRole = ROLES.IM_DUTY_2;
+              notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 내과인턴당직 2 담당 (${selectedWard}).`;
+            } else {
+              assignedRole = ROLES.IM_DUTY_1;
+              notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 내과인턴당직 1 담당 (${selectedWard}).`;
+            }
+          } else {
+            if (isIMDay1Ward) {
+              assignedRole = ROLES.IM_1;
+              notes = `평일 주간 61병동 심전도 검사는 내과 1(61병동 전담) 담당입니다.`;
+            } else {
+              assignedRole = ROLES.IM_2;
+              notes = `평일 주간 ${selectedWard} 심전도 검사는 내과 2(61 제외 전병동/ICU) 담당입니다.`;
+            }
+          }
+        } else {
+          // 비내과계 해당 병동 당직 인턴 매칭
+          const isGroupC = isNonIM2Ward || (!isNonIM1Ward && !isNonIM3Ward && WARD_GROUPS.GROUP_C.some(w => areWardsEqual(w, selectedWard)));
+          const isGroupD = isNonIM3Ward || (!isNonIM1Ward && !isNonIM2Ward && WARD_GROUPS.GROUP_D.some(w => areWardsEqual(w, selectedWard)));
+          if (isGroupC) {
+            assignedRole = ROLES.NON_IM_2;
+            backupRole = '1순위: 비내과1 (5-4080) / 2순위: 비내과3 (5-4082)';
+            dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
+            dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
+            notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 비내과계 병동 Group C(${selectedWard}) 비내과 당직인턴 2(5-4081) 담당입니다.`;
+          } else if (isNonIM1Ward) {
+            assignedRole = ROLES.NON_IM_1;
+            backupRole = '1순위: 비내과2 (5-4081)';
+            dutyPhone = DUTY_PHONES[ROLES.NON_IM_1];
+            dutyUcap = DUTY_UCAPS[ROLES.NON_IM_1];
+            notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 비내과계 지정 병동(${selectedWard}) 비내과 당직인턴 1(5-4080) 담당입니다.`;
+          } else if (isGroupD) {
+            assignedRole = ROLES.NON_IM_3;
+            backupRole = '1순위: 비내과1 (5-4080)';
+            dutyPhone = DUTY_PHONES[ROLES.NON_IM_3];
+            dutyUcap = DUTY_UCAPS[ROLES.NON_IM_3];
+            notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 비내과계 병동 Group D(${selectedWard}) 비내과 당직인턴 3(5-4082) 담당입니다.`;
+          } else {
+            assignedRole = ROLES.NON_IM_2;
+            backupRole = '1순위: 비내과1 (5-4080)';
+            dutyPhone = DUTY_PHONES[ROLES.NON_IM_2];
+            dutyUcap = DUTY_UCAPS[ROLES.NON_IM_2];
+            notes = `심전도 검사 당직시간(17:31~익일 05:59 / 휴일) 매칭: 비내과 당직인턴 2(5-4081) 담당입니다.`;
           }
         }
       }
@@ -776,8 +832,8 @@ export function evaluateDutyRules(
       if (dayType === 'WEEKDAY' && isWeekendOrHoliday) return false;
       if (dayType === 'WEEKEND_HOLIDAY' && !isWeekendOrHoliday) return false;
       const sTime = p.startTime || '06:00';
-      const eTime = p.endTime || (isOct2026OrLater ? '17:00' : '08:00');
-      if (selectedTime < sTime || selectedTime >= eTime) return false;
+      const eTime = p.endTime || (isOct2026OrLater ? '17:30' : '08:00');
+      if (selectedTime < sTime || selectedTime > eTime) return false;
       return true;
     });
     if (matchedPathologist) {
@@ -814,7 +870,11 @@ export function evaluateDutyRules(
     }
     // 당직 기준 날짜(effectiveDutyDate): 00:00 ~ 08:00 시간대는 전날 시작된 당직의 연장 근무이므로 effectiveDutyDate를 우선 조회
     const targetScheduleDate = isDutyHours ? effectiveDutyDate : selectedDate;
-    const dutySchedule = schedules[targetScheduleDate] || schedules[selectedDate];
+    const dutySchedule =
+      schedules[targetScheduleDate] ||
+      Object.entries(schedules).find(([k]) => k.startsWith(targetScheduleDate))?.[1] ||
+      schedules[selectedDate] ||
+      Object.entries(schedules).find(([k]) => k.startsWith(selectedDate))?.[1];
     if (dutySchedule) {
       const doctor = getScheduleDoctor(dutySchedule, assignedRole);
       if (doctor) {
@@ -845,16 +905,21 @@ export function evaluateDutyRules(
       }
     }
 
-    // 관리자 공용 당직폰 설정 조회
+    // 관리자 공용 당직폰 설정 조회 ('비내과'가 '내과'로 오매칭되지 않도록 명확히 구분)
     const cleanAssigned = (assignedRole || '').replace(/\s+/g, '');
+    const isAssignedNonIm = cleanAssigned.includes('비내과') || cleanAssigned.toLowerCase().includes('non');
+    const isAssignedIm = !isAssignedNonIm && (cleanAssigned.includes('내과') || cleanAssigned.toLowerCase().includes('im'));
     const matchedDutyPhone = cleanAssigned ? dutyPhones.find(dp => {
       const cleanDp = dp.roleName.replace(/\s+/g, '');
-      if (cleanDp === cleanAssigned || cleanAssigned.includes(cleanDp) || cleanDp.includes(cleanAssigned)) return true;
-      if (cleanAssigned.includes('내과') && cleanDp.includes('내과')) {
+      const isDpNonIm = cleanDp.includes('비내과') || dp.deptCategory === '비내과';
+      const isDpIm = !isDpNonIm && (cleanDp.includes('내과') || dp.deptCategory === '내과');
+
+      if (cleanDp === cleanAssigned) return true;
+      if (isAssignedIm && isDpIm) {
         if (cleanAssigned.includes('1') && cleanDp.includes('1')) return true;
         if (cleanAssigned.includes('2') && cleanDp.includes('2')) return true;
       }
-      if (cleanAssigned.includes('비내과') && cleanDp.includes('비내과')) {
+      if (isAssignedNonIm && isDpNonIm) {
         if (cleanAssigned.includes('1') && cleanDp.includes('1')) return true;
         if (cleanAssigned.includes('2') && cleanDp.includes('2')) return true;
         if (cleanAssigned.includes('3') && cleanDp.includes('3')) return true;
@@ -866,8 +931,8 @@ export function evaluateDutyRules(
     const matchedIntern = interns.find(it => it.name && assignedPerson && it.name.trim() === assignedPerson.trim());
     if (matchedIntern) {
       contactInfo = {
-        phone: matchedIntern.phone || '미등록',
-        ucap: matchedIntern.ucap || '미등록',
+        phone: matchedIntern.phone || contacts[assignedPerson]?.phone || '미등록',
+        ucap: matchedIntern.ucap || contacts[assignedPerson]?.ucap || '미등록',
         dumcTalk: `${matchedIntern.name}(${matchedIntern.dept || '전공의'})`
       };
     } else if (contacts[assignedPerson]) {
@@ -875,9 +940,16 @@ export function evaluateDutyRules(
     }
 
     // 내과계 인턴: 공용 당직폰 번호가 등록된 경우 당직폰 우선 (미등록 시 개인 UCAP/개인폰)
-    if (assignedRole === ROLES.IM_1 || assignedRole === ROLES.IM_2 || assignedRole?.includes('내과')) {
-      dutyUcap = dutyUcap || (matchedDutyPhone && matchedDutyPhone.ucap) || contactInfo.ucap;
-      dutyPhone = dutyPhone || (matchedDutyPhone && matchedDutyPhone.phone) || contactInfo.phone;
+    if (isAssignedIm) {
+      const validPersonalUcap = (contactInfo.ucap && contactInfo.ucap !== '정보 없음' && contactInfo.ucap !== '미등록') ? contactInfo.ucap : '';
+      const validPersonalPhone = (contactInfo.phone && contactInfo.phone !== '정보 없음' && contactInfo.phone !== '미등록') ? contactInfo.phone : '';
+      dutyUcap = dutyUcap || (matchedDutyPhone && matchedDutyPhone.ucap) || validPersonalUcap || DUTY_UCAPS[assignedRole] || contactInfo.ucap;
+      dutyPhone = dutyPhone || (matchedDutyPhone && matchedDutyPhone.phone) || validPersonalPhone || DUTY_PHONES[assignedRole] || contactInfo.phone;
+      contactInfo = {
+        phone: validPersonalPhone || dutyPhone || '정보 없음',
+        ucap: validPersonalUcap || dutyUcap || '정보 없음',
+        dumcTalk: contactInfo.dumcTalk || assignedPerson
+      };
     } 
     // 비내과계 인턴: 공용 당직폰 번호 우선 연결
     else if (matchedDutyPhone && (matchedDutyPhone.phone || matchedDutyPhone.ucap)) {
